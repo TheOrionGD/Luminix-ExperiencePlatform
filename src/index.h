@@ -524,7 +524,7 @@ ErrorCode index_clear_cache(Index* index);
 // ==================== INDEX TYPE SPECIFIC APIS ====================
 
 // Hash Index
-HashIndex* hash_index_create(int capacity, double load_factor);
+HashIndex* hash_index_create(int capacity);
 HashIndex* hash_index_create_ex(IndexConfig* config);
 ErrorCode hash_index_resize(HashIndex* hash, int new_capacity);
 ErrorCode hash_index_rehash(HashIndex* hash);
@@ -553,7 +553,7 @@ Record** bitmap_index_or(BitmapIndex* a, BitmapIndex* b, int* out_count);
 Record** bitmap_index_not(BitmapIndex* bitmap, int* out_count);
 
 // Full-Text Index
-FullTextIndex* fulltext_index_create(bool case_sensitive);
+FullTextIndex* fulltext_index_create(void);
 FullTextIndex* fulltext_index_create_ex(IndexConfig* config);
 ErrorCode fulltext_index_add_stop_word(FullTextIndex* index, const char* word);
 ErrorCode fulltext_index_remove_stop_word(FullTextIndex* index, const char* word);
@@ -561,11 +561,10 @@ ErrorCode fulltext_index_stem_words(FullTextIndex* index, bool enable);
 ErrorCode fulltext_index_build_dictionary(FullTextIndex* index);
 
 // Spatial Index
-SpatialIndex* spatial_index_create(int dimensions, int max_capacity);
+SpatialIndex* spatial_index_create(int max_capacity);
 SpatialIndex* spatial_index_create_ex(IndexConfig* config);
-ErrorCode spatial_index_insert_point(SpatialIndex* index, double x, double y, 
-                                    int record_id, Record* record);
-ErrorCode spatial_index_insert_point_ex(SpatialIndex* index, double* coordinates,
+int spatial_index_insert_point(SpatialIndex* index, double x, double y, 
+                              int record_id, Record* record);ErrorCode spatial_index_insert_point_ex(SpatialIndex* index, double* coordinates,
                                        int dimensions, int record_id, Record* record);
 ErrorCode spatial_index_remove_point(SpatialIndex* index, int record_id);
 double spatial_index_calculate_distance(SpatialPoint* a, SpatialPoint* b);

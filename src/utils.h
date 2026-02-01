@@ -1,10 +1,15 @@
 #ifndef UTILS_H
 #define UTILS_H
 
+#ifdef _WIN32
+#include <windows.h>   // <-- REQUIRED for LARGE_INTEGER
+#endif
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+
 
 // Constants
 #define MAX_TABLE_NAME_LEN 64

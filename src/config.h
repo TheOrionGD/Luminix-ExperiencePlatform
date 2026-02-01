@@ -1,6 +1,15 @@
 #ifndef CONFIG_H
 #define CONFIG_H
+// In config.h or as constants in index.c:
+#define DEFAULT_HASH_CAPACITY 1024
+#define DEFAULT_LOAD_FACTOR 0.75
+#define DEFAULT_SPATIAL_CAPACITY 100
+#define CONCURRENT_INDEXING true  // or false based on your configuration
 
+// Error codes (if not already defined)
+#define ERROR_INVALID_ARGUMENT -1
+#define ERROR_MEMORY -2
+// ... other error codes
 // ==================== DATABASE CONFIGURATION ====================
 #define MAX_FIELD_LEN 256
 #define MAX_TABLE_NAME 50
