@@ -1,0 +1,1037 @@
+{
+  "database": {
+    "name": "luminix_demo",
+    "version": "1.0.0",
+    "description": "Luminix Database Management System",
+    "created": "2024-01-15T10:30:00Z",
+    "last_modified": "2024-01-15T10:30:00Z",
+    "engine": "LuminixDB",
+    "engine_version": "1.0.0"
+  },
+  
+  "configuration": {
+    "storage": {
+      "type": "json",
+      "compression": true,
+      "encryption": false,
+      "auto_save": true,
+      "save_interval": 300,
+      "backup_enabled": true,
+      "backup_interval": 86400,
+      "max_backups": 10
+    },
+    
+    "memory": {
+      "cache_size": 10485760,
+      "cache_policy": "LRU",
+      "max_memory": 1073741824,
+      "page_size": 4096
+    },
+    
+    "performance": {
+      "max_connections": 100,
+      "query_timeout": 30,
+      "transaction_timeout": 60,
+      "auto_vacuum": true,
+      "vacuum_threshold": 1000,
+      "auto_optimize": true,
+      "optimize_threshold": 100
+    },
+    
+    "security": {
+      "authentication": false,
+      "encryption": false,
+      "audit_log": false,
+      "max_login_attempts": 5,
+      "lockout_duration": 300
+    },
+    
+    "logging": {
+      "enabled": true,
+      "level": "INFO",
+      "file": "luminix.log",
+      "max_size": 10485760,
+      "max_files": 5
+    }
+  },
+  
+  "tables": [
+    {
+      "name": "users",
+      "description": "User accounts table",
+      "created": "2024-01-15T10:30:00Z",
+      "record_count": 0,
+      "fields": [
+        {
+          "name": "id",
+          "type": "INT",
+          "constraints": {
+            "primary_key": true,
+            "auto_increment": true,
+            "nullable": false,
+            "unique": true
+          },
+          "description": "Primary key"
+        },
+        {
+          "name": "username",
+          "type": "STRING",
+          "constraints": {
+            "primary_key": false,
+            "nullable": false,
+            "unique": true,
+            "max_length": 50
+          },
+          "description": "Unique username"
+        },
+        {
+          "name": "email",
+          "type": "STRING",
+          "constraints": {
+            "primary_key": false,
+            "nullable": false,
+            "unique": true,
+            "max_length": 100
+          },
+          "description": "User email address"
+        },
+        {
+          "name": "password_hash",
+          "type": "STRING",
+          "constraints": {
+            "primary_key": false,
+            "nullable": false,
+            "unique": false,
+            "max_length": 255
+          },
+          "description": "Hashed password"
+        },
+        {
+          "name": "first_name",
+          "type": "STRING",
+          "constraints": {
+            "primary_key": false,
+            "nullable": true,
+            "unique": false,
+            "max_length": 50
+          },
+          "description": "First name"
+        },
+        {
+          "name": "last_name",
+          "type": "STRING",
+          "constraints": {
+            "primary_key": false,
+            "nullable": true,
+            "unique": false,
+            "max_length": 50
+          },
+          "description": "Last name"
+        },
+        {
+          "name": "created_at",
+          "type": "DATETIME",
+          "constraints": {
+            "primary_key": false,
+            "nullable": false,
+            "unique": false,
+            "default": "CURRENT_TIMESTAMP"
+          },
+          "description": "Account creation timestamp"
+        },
+        {
+          "name": "updated_at",
+          "type": "DATETIME",
+          "constraints": {
+            "primary_key": false,
+            "nullable": false,
+            "unique": false,
+            "default": "CURRENT_TIMESTAMP",
+            "on_update": "CURRENT_TIMESTAMP"
+          },
+          "description": "Last update timestamp"
+        },
+        {
+          "name": "is_active",
+          "type": "BOOL",
+          "constraints": {
+            "primary_key": false,
+            "nullable": false,
+            "unique": false,
+            "default": true
+          },
+          "description": "Account status"
+        },
+        {
+          "name": "role",
+          "type": "STRING",
+          "constraints": {
+            "primary_key": false,
+            "nullable": false,
+            "unique": false,
+            "max_length": 20,
+            "default": "user",
+            "check": "role IN ('admin', 'moderator', 'user', 'guest')"
+          },
+          "description": "User role"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "idx_users_username",
+          "field": "username",
+          "type": "HASH",
+          "unique": true,
+          "description": "Index for username lookups"
+        },
+        {
+          "name": "idx_users_email",
+          "field": "email",
+          "type": "HASH",
+          "unique": true,
+          "description": "Index for email lookups"
+        },
+        {
+          "name": "idx_users_created_at",
+          "field": "created_at",
+          "type": "BTREE",
+          "unique": false,
+          "description": "Index for date-based queries"
+        },
+        {
+          "name": "idx_users_role_status",
+          "fields": ["role", "is_active"],
+          "type": "BTREE",
+          "unique": false,
+          "description": "Composite index for role and status queries"
+        }
+      ],
+      "triggers": [
+        {
+          "name": "trg_users_update_timestamp",
+          "event": "BEFORE_UPDATE",
+          "action": "SET updated_at = CURRENT_TIMESTAMP",
+          "description": "Automatically update timestamp on record update"
+        }
+      ]
+    },
+    
+    {
+      "name": "products",
+      "description": "Product catalog table",
+      "created": "2024-01-15T10:30:00Z",
+      "record_count": 0,
+      "fields": [
+        {
+          "name": "id",
+          "type": "INT",
+          "constraints": {
+            "primary_key": true,
+            "auto_increment": true,
+            "nullable": false,
+            "unique": true
+          },
+          "description": "Product ID"
+        },
+        {
+          "name": "sku",
+          "type": "STRING",
+          "constraints": {
+            "primary_key": false,
+            "nullable": false,
+            "unique": true,
+            "max_length": 50
+          },
+          "description": "Stock Keeping Unit"
+        },
+        {
+          "name": "name",
+          "type": "STRING",
+          "constraints": {
+            "primary_key": false,
+            "nullable": false,
+            "unique": false,
+            "max_length": 200
+          },
+          "description": "Product name"
+        },
+        {
+          "name": "description",
+          "type": "STRING",
+          "constraints": {
+            "primary_key": false,
+            "nullable": true,
+            "unique": false,
+            "max_length": 2000
+          },
+          "description": "Product description"
+        },
+        {
+          "name": "category",
+          "type": "STRING",
+          "constraints": {
+            "primary_key": false,
+            "nullable": false,
+            "unique": false,
+            "max_length": 100
+          },
+          "description": "Product category"
+        },
+        {
+          "name": "price",
+          "type": "DOUBLE",
+          "constraints": {
+            "primary_key": false,
+            "nullable": false,
+            "unique": false,
+            "check": "price >= 0"
+          },
+          "description": "Product price"
+        },
+        {
+          "name": "stock_quantity",
+          "type": "INT",
+          "constraints": {
+            "primary_key": false,
+            "nullable": false,
+            "unique": false,
+            "check": "stock_quantity >= 0",
+            "default": 0
+          },
+          "description": "Available stock"
+        },
+        {
+          "name": "created_at",
+          "type": "DATETIME",
+          "constraints": {
+            "primary_key": false,
+            "nullable": false,
+            "unique": false,
+            "default": "CURRENT_TIMESTAMP"
+          },
+          "description": "Product creation timestamp"
+        },
+        {
+          "name": "updated_at",
+          "type": "DATETIME",
+          "constraints": {
+            "primary_key": false,
+            "nullable": false,
+            "unique": false,
+            "default": "CURRENT_TIMESTAMP",
+            "on_update": "CURRENT_TIMESTAMP"
+          },
+          "description": "Last update timestamp"
+        },
+        {
+          "name": "is_active",
+          "type": "BOOL",
+          "constraints": {
+            "primary_key": false,
+            "nullable": false,
+            "unique": false,
+            "default": true
+          },
+          "description": "Product status"
+        },
+        {
+          "name": "metadata",
+          "type": "JSON",
+          "constraints": {
+            "primary_key": false,
+            "nullable": true,
+            "unique": false
+          },
+          "description": "Additional product metadata"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "idx_products_sku",
+          "field": "sku",
+          "type": "HASH",
+          "unique": true,
+          "description": "Index for SKU lookups"
+        },
+        {
+          "name": "idx_products_category",
+          "field": "category",
+          "type": "BTREE",
+          "unique": false,
+          "description": "Index for category queries"
+        },
+        {
+          "name": "idx_products_price",
+          "field": "price",
+          "type": "BTREE",
+          "unique": false,
+          "description": "Index for price range queries"
+        },
+        {
+          "name": "idx_products_name_ft",
+          "field": "name",
+          "type": "FULLTEXT",
+          "unique": false,
+          "description": "Full-text index for product name search"
+        },
+        {
+          "name": "idx_products_category_price",
+          "fields": ["category", "price"],
+          "type": "BTREE",
+          "unique": false,
+          "description": "Composite index for category and price queries"
+        }
+      ]
+    },
+    
+    {
+      "name": "orders",
+      "description": "Customer orders table",
+      "created": "2024-01-15T10:30:00Z",
+      "record_count": 0,
+      "fields": [
+        {
+          "name": "id",
+          "type": "INT",
+          "constraints": {
+            "primary_key": true,
+            "auto_increment": true,
+            "nullable": false,
+            "unique": true
+          },
+          "description": "Order ID"
+        },
+        {
+          "name": "order_number",
+          "type": "STRING",
+          "constraints": {
+            "primary_key": false,
+            "nullable": false,
+            "unique": true,
+            "max_length": 50
+          },
+          "description": "Unique order number"
+        },
+        {
+          "name": "user_id",
+          "type": "INT",
+          "constraints": {
+            "primary_key": false,
+            "nullable": false,
+            "unique": false,
+            "foreign_key": {
+              "table": "users",
+              "field": "id",
+              "on_delete": "RESTRICT",
+              "on_update": "CASCADE"
+            }
+          },
+          "description": "Reference to user"
+        },
+        {
+          "name": "order_date",
+          "type": "DATETIME",
+          "constraints": {
+            "primary_key": false,
+            "nullable": false,
+            "unique": false,
+            "default": "CURRENT_TIMESTAMP"
+          },
+          "description": "Order date and time"
+        },
+        {
+          "name": "status",
+          "type": "STRING",
+          "constraints": {
+            "primary_key": false,
+            "nullable": false,
+            "unique": false,
+            "max_length": 20,
+            "default": "pending",
+            "check": "status IN ('pending', 'processing', 'shipped', 'delivered', 'cancelled')"
+          },
+          "description": "Order status"
+        },
+        {
+          "name": "total_amount",
+          "type": "DOUBLE",
+          "constraints": {
+            "primary_key": false,
+            "nullable": false,
+            "unique": false,
+            "check": "total_amount >= 0"
+          },
+          "description": "Total order amount"
+        },
+        {
+          "name": "shipping_address",
+          "type": "JSON",
+          "constraints": {
+            "primary_key": false,
+            "nullable": false,
+            "unique": false
+          },
+          "description": "Shipping address details"
+        },
+        {
+          "name": "payment_method",
+          "type": "STRING",
+          "constraints": {
+            "primary_key": false,
+            "nullable": false,
+            "unique": false,
+            "max_length": 50
+          },
+          "description": "Payment method used"
+        },
+        {
+          "name": "payment_status",
+          "type": "STRING",
+          "constraints": {
+            "primary_key": false,
+            "nullable": false,
+            "unique": false,
+            "max_length": 20,
+            "default": "pending",
+            "check": "payment_status IN ('pending', 'paid', 'failed', 'refunded')"
+          },
+          "description": "Payment status"
+        },
+        {
+          "name": "notes",
+          "type": "STRING",
+          "constraints": {
+            "primary_key": false,
+            "nullable": true,
+            "unique": false,
+            "max_length": 1000
+          },
+          "description": "Order notes"
+        },
+        {
+          "name": "metadata",
+          "type": "JSON",
+          "constraints": {
+            "primary_key": false,
+            "nullable": true,
+            "unique": false
+          },
+          "description": "Additional order metadata"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "idx_orders_order_number",
+          "field": "order_number",
+          "type": "HASH",
+          "unique": true,
+          "description": "Index for order number lookups"
+        },
+        {
+          "name": "idx_orders_user_id",
+          "field": "user_id",
+          "type": "HASH",
+          "unique": false,
+          "description": "Index for user order queries"
+        },
+        {
+          "name": "idx_orders_order_date",
+          "field": "order_date",
+          "type": "BTREE",
+          "unique": false,
+          "description": "Index for date-based order queries"
+        },
+        {
+          "name": "idx_orders_status",
+          "field": "status",
+          "type": "BITMAP",
+          "unique": false,
+          "description": "Bitmap index for status queries (low cardinality)"
+        },
+        {
+          "name": "idx_orders_user_date",
+          "fields": ["user_id", "order_date"],
+          "type": "BTREE",
+          "unique": false,
+          "description": "Composite index for user and date queries"
+        }
+      ]
+    },
+    
+    {
+      "name": "order_items",
+      "description": "Order line items table",
+      "created": "2024-01-15T10:30:00Z",
+      "record_count": 0,
+      "fields": [
+        {
+          "name": "id",
+          "type": "INT",
+          "constraints": {
+            "primary_key": true,
+            "auto_increment": true,
+            "nullable": false,
+            "unique": true
+          },
+          "description": "Order item ID"
+        },
+        {
+          "name": "order_id",
+          "type": "INT",
+          "constraints": {
+            "primary_key": false,
+            "nullable": false,
+            "unique": false,
+            "foreign_key": {
+              "table": "orders",
+              "field": "id",
+              "on_delete": "CASCADE",
+              "on_update": "CASCADE"
+            }
+          },
+          "description": "Reference to order"
+        },
+        {
+          "name": "product_id",
+          "type": "INT",
+          "constraints": {
+            "primary_key": false,
+            "nullable": false,
+            "unique": false,
+            "foreign_key": {
+              "table": "products",
+              "field": "id",
+              "on_delete": "RESTRICT",
+              "on_update": "CASCADE"
+            }
+          },
+          "description": "Reference to product"
+        },
+        {
+          "name": "quantity",
+          "type": "INT",
+          "constraints": {
+            "primary_key": false,
+            "nullable": false,
+            "unique": false,
+            "check": "quantity > 0",
+            "default": 1
+          },
+          "description": "Quantity ordered"
+        },
+        {
+          "name": "unit_price",
+          "type": "DOUBLE",
+          "constraints": {
+            "primary_key": false,
+            "nullable": false,
+            "unique": false,
+            "check": "unit_price >= 0"
+          },
+          "description": "Price per unit at time of order"
+        },
+        {
+          "name": "total_price",
+          "type": "DOUBLE",
+          "constraints": {
+            "primary_key": false,
+            "nullable": false,
+            "unique": false,
+            "check": "total_price >= 0"
+          },
+          "description": "Total price for this line item"
+        },
+        {
+          "name": "notes",
+          "type": "STRING",
+          "constraints": {
+            "primary_key": false,
+            "nullable": true,
+            "unique": false,
+            "max_length": 500
+          },
+          "description": "Item-specific notes"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "idx_order_items_order_id",
+          "field": "order_id",
+          "type": "HASH",
+          "unique": false,
+          "description": "Index for order item lookups"
+        },
+        {
+          "name": "idx_order_items_product_id",
+          "field": "product_id",
+          "type": "HASH",
+          "unique": false,
+          "description": "Index for product lookups in orders"
+        },
+        {
+          "name": "idx_order_items_order_product",
+          "fields": ["order_id", "product_id"],
+          "type": "BTREE",
+          "unique": false,
+          "description": "Composite index for order and product queries"
+        }
+      ]
+    },
+    
+    {
+      "name": "audit_log",
+      "description": "System audit log table",
+      "created": "2024-01-15T10:30:00Z",
+      "record_count": 0,
+      "fields": [
+        {
+          "name": "id",
+          "type": "INT",
+          "constraints": {
+            "primary_key": true,
+            "auto_increment": true,
+            "nullable": false,
+            "unique": true
+          },
+          "description": "Log entry ID"
+        },
+        {
+          "name": "timestamp",
+          "type": "DATETIME",
+          "constraints": {
+            "primary_key": false,
+            "nullable": false,
+            "unique": false,
+            "default": "CURRENT_TIMESTAMP"
+          },
+          "description": "Event timestamp"
+        },
+        {
+          "name": "user_id",
+          "type": "INT",
+          "constraints": {
+            "primary_key": false,
+            "nullable": true,
+            "unique": false,
+            "foreign_key": {
+              "table": "users",
+              "field": "id",
+              "on_delete": "SET_NULL",
+              "on_update": "CASCADE"
+            }
+          },
+          "description": "User who performed the action"
+        },
+        {
+          "name": "action",
+          "type": "STRING",
+          "constraints": {
+            "primary_key": false,
+            "nullable": false,
+            "unique": false,
+            "max_length": 50
+          },
+          "description": "Action performed (CREATE, UPDATE, DELETE, etc.)"
+        },
+        {
+          "name": "table_name",
+          "type": "STRING",
+          "constraints": {
+            "primary_key": false,
+            "nullable": false,
+            "unique": false,
+            "max_length": 100
+          },
+          "description": "Table affected by the action"
+        },
+        {
+          "name": "record_id",
+          "type": "INT",
+          "constraints": {
+            "primary_key": false,
+            "nullable": true,
+            "unique": false
+          },
+          "description": "ID of the affected record"
+        },
+        {
+          "name": "old_values",
+          "type": "JSON",
+          "constraints": {
+            "primary_key": false,
+            "nullable": true,
+            "unique": false
+          },
+          "description": "Previous values before change"
+        },
+        {
+          "name": "new_values",
+          "type": "JSON",
+          "constraints": {
+            "primary_key": false,
+            "nullable": true,
+            "unique": false
+          },
+          "description": "New values after change"
+        },
+        {
+          "name": "ip_address",
+          "type": "STRING",
+          "constraints": {
+            "primary_key": false,
+            "nullable": true,
+            "unique": false,
+            "max_length": 45
+          },
+          "description": "IP address of the user"
+        },
+        {
+          "name": "user_agent",
+          "type": "STRING",
+          "constraints": {
+            "primary_key": false,
+            "nullable": true,
+            "unique": false,
+            "max_length": 500
+          },
+          "description": "User agent string"
+        },
+        {
+          "name": "details",
+          "type": "JSON",
+          "constraints": {
+            "primary_key": false,
+            "nullable": true,
+            "unique": false
+          },
+          "description": "Additional audit details"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "idx_audit_timestamp",
+          "field": "timestamp",
+          "type": "BTREE",
+          "unique": false,
+          "description": "Index for timestamp-based queries"
+        },
+        {
+          "name": "idx_audit_user_id",
+          "field": "user_id",
+          "type": "HASH",
+          "unique": false,
+          "description": "Index for user-specific audit queries"
+        },
+        {
+          "name": "idx_audit_action",
+          "field": "action",
+          "type": "BITMAP",
+          "unique": false,
+          "description": "Bitmap index for action type queries"
+        },
+        {
+          "name": "idx_audit_table",
+          "field": "table_name",
+          "type": "HASH",
+          "unique": false,
+          "description": "Index for table-specific audit queries"
+        },
+        {
+          "name": "idx_audit_user_timestamp",
+          "fields": ["user_id", "timestamp"],
+          "type": "BTREE",
+          "unique": false,
+          "description": "Composite index for user and timestamp queries"
+        }
+      ]
+    }
+  ],
+  
+  "relationships": [
+    {
+      "name": "fk_orders_user",
+      "type": "FOREIGN_KEY",
+      "from_table": "orders",
+      "from_field": "user_id",
+      "to_table": "users",
+      "to_field": "id",
+      "on_delete": "RESTRICT",
+      "on_update": "CASCADE",
+      "description": "Link orders to users"
+    },
+    {
+      "name": "fk_order_items_order",
+      "type": "FOREIGN_KEY",
+      "from_table": "order_items",
+      "from_field": "order_id",
+      "to_table": "orders",
+      "to_field": "id",
+      "on_delete": "CASCADE",
+      "on_update": "CASCADE",
+      "description": "Link order items to orders"
+    },
+    {
+      "name": "fk_order_items_product",
+      "type": "FOREIGN_KEY",
+      "from_table": "order_items",
+      "from_field": "product_id",
+      "to_table": "products",
+      "to_field": "id",
+      "on_delete": "RESTRICT",
+      "on_update": "CASCADE",
+      "description": "Link order items to products"
+    },
+    {
+      "name": "fk_audit_log_user",
+      "type": "FOREIGN_KEY",
+      "from_table": "audit_log",
+      "from_field": "user_id",
+      "to_table": "users",
+      "to_field": "id",
+      "on_delete": "SET_NULL",
+      "on_update": "CASCADE",
+      "description": "Link audit log entries to users"
+    }
+  ],
+  
+  "views": [
+    {
+      "name": "vw_user_orders_summary",
+      "description": "Summary of user orders with aggregated data",
+      "query": "SELECT u.id as user_id, u.username, u.email, COUNT(o.id) as total_orders, SUM(o.total_amount) as total_spent, MAX(o.order_date) as last_order_date FROM users u LEFT JOIN orders o ON u.id = o.user_id GROUP BY u.id, u.username, u.email",
+      "materialized": false,
+      "columns": [
+        "user_id",
+        "username",
+        "email",
+        "total_orders",
+        "total_spent",
+        "last_order_date"
+      ]
+    },
+    {
+      "name": "vw_product_sales",
+      "description": "Product sales statistics",
+      "query": "SELECT p.id as product_id, p.name, p.sku, p.category, SUM(oi.quantity) as total_quantity_sold, SUM(oi.total_price) as total_revenue, COUNT(DISTINCT oi.order_id) as order_count FROM products p LEFT JOIN order_items oi ON p.id = oi.product_id GROUP BY p.id, p.name, p.sku, p.category",
+      "materialized": false,
+      "columns": [
+        "product_id",
+        "name",
+        "sku",
+        "category",
+        "total_quantity_sold",
+        "total_revenue",
+        "order_count"
+      ]
+    }
+  ],
+  
+  "stored_procedures": [
+    {
+      "name": "sp_create_order",
+      "description": "Creates a new order with items",
+      "parameters": [
+        {"name": "p_user_id", "type": "INT"},
+        {"name": "p_items", "type": "JSON"},
+        {"name": "p_shipping_address", "type": "JSON"},
+        {"name": "p_payment_method", "type": "STRING"}
+      ],
+      "body": "BEGIN\n  -- Implementation for creating orders\n  -- This would handle transaction management, stock updates, etc.\nEND"
+    },
+    {
+      "name": "sp_update_product_stock",
+      "description": "Updates product stock quantity",
+      "parameters": [
+        {"name": "p_product_id", "type": "INT"},
+        {"name": "p_quantity_change", "type": "INT"}
+      ],
+      "body": "BEGIN\n  -- Implementation for updating stock\n  -- This would handle concurrency and validation\nEND"
+    }
+  ],
+  
+  "triggers": [
+    {
+      "name": "trg_orders_before_insert",
+      "table": "orders",
+      "event": "BEFORE_INSERT",
+      "action": "BEGIN\n  -- Generate unique order number\n  SET NEW.order_number = CONCAT('ORD-', UNIX_TIMESTAMP(), '-', FLOOR(RAND() * 10000));\nEND",
+      "description": "Generates unique order number before insert"
+    },
+    {
+      "name": "trg_order_items_before_insert",
+      "table": "order_items",
+      "event": "BEFORE_INSERT",
+      "action": "BEGIN\n  -- Calculate total price\n  SET NEW.total_price = NEW.quantity * NEW.unit_price;\nEND",
+      "description": "Calculates total price for order items"
+    }
+  ],
+  
+  "seeds": {
+    "users": [
+      {
+        "id": 1,
+        "username": "admin",
+        "email": "admin@example.com",
+        "password_hash": "$2y$10$YourHashedPasswordHere",
+        "first_name": "System",
+        "last_name": "Administrator",
+        "created_at": "2024-01-15T10:30:00Z",
+        "updated_at": "2024-01-15T10:30:00Z",
+        "is_active": true,
+        "role": "admin"
+      },
+      {
+        "id": 2,
+        "username": "johndoe",
+        "email": "john.doe@example.com",
+        "password_hash": "$2y$10$AnotherHashedPassword",
+        "first_name": "John",
+        "last_name": "Doe",
+        "created_at": "2024-01-15T10:31:00Z",
+        "updated_at": "2024-01-15T10:31:00Z",
+        "is_active": true,
+        "role": "user"
+      }
+    ],
+    "products": [
+      {
+        "id": 1,
+        "sku": "PROD-001",
+        "name": "Laptop Pro",
+        "description": "High-performance laptop with 16GB RAM and 1TB SSD",
+        "category": "Electronics",
+        "price": 1299.99,
+        "stock_quantity": 50,
+        "created_at": "2024-01-15T10:32:00Z",
+        "updated_at": "2024-01-15T10:32:00Z",
+        "is_active": true,
+        "metadata": {"brand": "TechBrand", "warranty": "2 years"}
+      },
+      {
+        "id": 2,
+        "sku": "PROD-002",
+        "name": "Wireless Mouse",
+        "description": "Ergonomic wireless mouse with long battery life",
+        "category": "Accessories",
+        "price": 29.99,
+        "stock_quantity": 200,
+        "created_at": "2024-01-15T10:33:00Z",
+        "updated_at": "2024-01-15T10:33:00Z",
+        "is_active": true,
+        "metadata": {"brand": "Peripherals Inc", "color": "Black"}
+      }
+    ]
+  },
+  
+  "metadata": {
+    "schema_version": "1.0",
+    "migration_history": [],
+    "custom_settings": {
+      "theme": "dark",
+      "language": "en",
+      "timezone": "UTC",
+      "date_format": "YYYY-MM-DD",
+      "time_format": "HH:mm:ss"
+    }
+  }
+}
