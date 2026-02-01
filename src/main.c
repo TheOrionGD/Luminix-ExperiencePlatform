@@ -2282,9 +2282,9 @@ void show_examples() {
     
     printf("\n1. Basic CRUD Operations:\n");
     printf("   CREATE TABLE users (id INT, name STRING, email STRING)\n");
-    printf("   INSERT INTO users VALUES (1, 'Alice', 'alice@example.com')\n");
+    printf("   INSERT INTO users VALUES (1, 'OrionGD', 'oriongd@luminix.com')\n");
     printf("   SELECT * FROM users WHERE id = 1\n");
-    printf("   UPDATE users SET email = 'alice.new@example.com' WHERE id = 1\n");
+    printf("   UPDATE users SET email = 'oriongd@luminix.com' WHERE id = 1\n");
     printf("   DELETE FROM users WHERE id = 1\n");
     
     printf("\n2. Indexing:\n");
