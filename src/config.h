@@ -13,9 +13,7 @@
 // ==================== DATABASE CONFIGURATION ====================
 #define MAX_FIELD_LEN 256
 #define MAX_TABLE_NAME 50
-#define MAX_QUERY_LEN 1024
-#define DATABASE_FILE "database.json"
-#define INITIAL_CAPACITY 100
+
 #define LOAD_FACTOR 0.75
 #define MAX_TABLES 100
 #define MAX_RECORDS_PER_TABLE 10000

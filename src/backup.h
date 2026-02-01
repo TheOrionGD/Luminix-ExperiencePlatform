@@ -5,6 +5,7 @@
 
 #ifndef BACKUP_H
 #define BACKUP_H
+#include "config.h"
 
 int backup_create(const char* source_path, const char* backup_dir);
 int backup_restore(const char* backup_path, const char* target_path);

@@ -4,6 +4,7 @@
 #ifdef _WIN32
 #include <windows.h>   // <-- REQUIRED for LARGE_INTEGER
 #endif
+#include "config.h"
 
 #include <stdio.h>
 #include <stdlib.h>

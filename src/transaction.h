@@ -5,6 +5,7 @@
 
 #ifndef TRANSACTION_H
 #define TRANSACTION_H
+#include "config.h"
 
 typedef enum {
     TXN_ACTIVE,

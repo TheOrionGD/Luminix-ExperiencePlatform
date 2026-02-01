@@ -5,6 +5,7 @@
 
 #ifndef PARSER_H
 #define PARSER_H
+#include "config.h"
 
 typedef enum {
     QUERY_SELECT,

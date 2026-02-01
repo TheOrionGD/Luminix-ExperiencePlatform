@@ -1,65 +1,24 @@
 #ifndef DATABASE_H
 #define DATABASE_H
-#define NOT_FOUND ERROR_NOT_FOUND 
+
+#include "config.h"
 #include <stdbool.h>
 #include <time.h>
 
+
 // Constants
-#define MAX_TABLE_NAME 64
+
 #define MAX_FIELD_LEN 256
-#define MAX_FIELDS_PER_TABLE 32
+
 #define MAX_TABLES 100
-#define MAX_RECORDS_PER_TABLE 100000
+
 #define MAX_INDEXES_PER_TABLE 10
 #define INITIAL_CAPACITY 100
-#define BATCH_INSERT_SIZE 1000
+
 #define QUERY_CACHE_SIZE 100
 #define MAX_TRANSACTION_LEVEL 10
 #define DEFAULT_BTREE_DEGREE 3
 #define DEFAULT_SKIPLIST_MAX_LEVEL 16
-
-// Field types
-typedef enum {
-    TYPE_INT,
-    TYPE_STRING,
-    TYPE_FLOAT,
-    TYPE_DOUBLE,
-    TYPE_BOOL,
-    TYPE_DATETIME,
-    TYPE_BLOB,
-    TYPE_NULL,
-    TYPE_UNKNOWN
-} FieldType;
-
-// Index types
-typedef enum {
-    INDEX_HASH,
-    INDEX_BTREE,
-    INDEX_SKIPLIST,
-    INDEX_BITMAP,
-    INDEX_FULLTEXT
-} IndexType;
-
-// Cache policies
-typedef enum {
-    CACHE_LRU,
-    CACHE_LFU,
-    CACHE_FIFO
-} CachePolicy;
-
-// Error codes
-typedef enum {
-    SUCCESS = 0,
-    ERROR_INVALID_INPUT,
-    ERROR_MEMORY_ALLOCATION,
-    ERROR_NOT_FOUND,
-    ERROR_DUPLICATE_KEY,
-    ERROR_TABLE_FULL,
-    ERROR_INDEX_EXISTS,
-    ERROR_TYPE_MISMATCH,
-    ERROR_CONSTRAINT_VIOLATION,
-    ERROR_TRANSACTION_CONFLICT
-} ErrorCode;
 
 // Statistics constants
 typedef enum {

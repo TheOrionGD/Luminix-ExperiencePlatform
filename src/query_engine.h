@@ -4,6 +4,7 @@
 
 #ifndef QUERY_ENGINE_H
 #define QUERY_ENGINE_H
+#include "config.h"
 
 typedef struct {
     int success;

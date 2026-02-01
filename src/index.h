@@ -2,10 +2,8 @@
 #define INDEX_H
 
 #include "config.h"
-#include "database.h"
-#include <pthread.h>
-#include <stdbool.h>
-#include <time.h>
+#include "threading.h"
+
 
 // ==================== FORWARD DECLARATIONS ====================
 typedef struct Index Index;

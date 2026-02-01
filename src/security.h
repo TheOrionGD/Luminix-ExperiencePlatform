@@ -4,6 +4,7 @@
 
 #ifndef SECURITY_H
 #define SECURITY_H
+#include "config.h"
 
 #include <stddef.h>
 
