@@ -4,17 +4,13 @@
 #include "config.h"
 #include <stdbool.h>
 #include <time.h>
-
+#include <stddef.h>
 
 // Constants
-
 #define MAX_FIELD_LEN 256
-
 #define MAX_TABLES 100
-
 #define MAX_INDEXES_PER_TABLE 10
 #define INITIAL_CAPACITY 100
-
 #define QUERY_CACHE_SIZE 100
 #define MAX_TRANSACTION_LEVEL 10
 #define DEFAULT_BTREE_DEGREE 3
@@ -37,6 +33,14 @@ typedef enum {
     STAT_VACUUM_OPERATIONS,
     STAT_OPTIMIZATION_OPERATIONS
 } StatType;
+
+// Forward declarations
+typedef struct Index Index;
+typedef struct IndexManager IndexManager;
+typedef struct TableStatistics TableStatistics;
+typedef struct Cache Cache;
+typedef struct QueryResult QueryResult;
+typedef struct ParsedQuery ParsedQuery;
 
 // Field value union
 typedef union {
@@ -74,18 +78,21 @@ typedef struct Record {
     struct Record* next;
 } Record;
 
-// Index structure (forward declaration)
-typedef struct Index Index;
-
-// Index manager
-typedef struct {
+// IndexManager structure
+struct IndexManager {
     Index** indices;
     int index_count;
     int capacity;
-} IndexManager;
+};
 
-// Table statistics
-typedef struct TableStatistics TableStatistics;
+// Table statistics structure
+struct TableStatistics {
+    long long records_inserted;
+    long long records_updated;
+    long long records_deleted;
+    long long queries_executed;
+    long long index_operations;
+};
 
 // Table structure
 typedef struct {
@@ -118,16 +125,15 @@ typedef struct {
     long long indexes_dropped;
     long long vacuum_operations;
     long long optimization_operations;
+
+    // Added fields for main.c compatibility
+    double total_query_time;      // Total query execution time
+    size_t memory_used;           // Current memory usage
+    size_t peak_memory_used;      // Peak memory usage
+    size_t cache_memory_used;     // Memory used by cache
+    int deadlocks_detected;       // Deadlocks detected
+    int backup_operations;        // Backup operations
 } DatabaseStatistics;
-
-// Cache structure (forward declaration)
-typedef struct Cache Cache;
-
-// Query result (forward declaration)
-typedef struct QueryResult QueryResult;
-
-// Parsed query (forward declaration)
-typedef struct ParsedQuery ParsedQuery;
 
 // Database structure
 typedef struct {
@@ -142,9 +148,20 @@ typedef struct {
     time_t transaction_start_time;
 } Database;
 
-// Function prototypes
+// ====================== Function Prototypes ====================== //
+
+// Database management
 Database* db_create();
 void db_free(Database* db);
+DatabaseStatistics* db_get_statistics(Database* db);
+TableStatistics* db_get_table_statistics(Database* db, const char* table_name);
+int db_get_table_count(Database* db);
+int db_get_record_count(Database* db, const char* table_name);
+char** db_list_tables(Database* db, int* out_count);
+void db_print_schema(Database* db);
+void db_print_statistics(Database* db);
+
+// Table operations
 ErrorCode db_add_table(Database* db, const char* name, const char** field_names, 
                       FieldType* types, int field_count, Table** out_table);
 Table* db_get_table(Database* db, const char* table_name);
@@ -162,26 +179,29 @@ ErrorCode db_delete_record(Database* db, const char* table_name, int id);
 ErrorCode db_delete_records_by_field(Database* db, const char* table_name,
                                      const char* field_name, const void* value,
                                      int* out_count);
-QueryResult* db_execute_query(Database* db, const char* query);
-ErrorCode db_create_index(Database* db, const char* table_name, 
-                         const char* field_name, IndexType type);
+
+// Index operations
+ErrorCode db_create_index(Database* db, const char* table_name, const char* field_name, IndexType type);
 ErrorCode db_drop_index(Database* db, const char* table_name, const char* field_name);
+Index* index_manager_get_index(IndexManager* manager, const char* field_name);
+
+// Transaction management
 ErrorCode db_begin_transaction(Database* db);
 ErrorCode db_commit_transaction(Database* db);
 ErrorCode db_rollback_transaction(Database* db);
-DatabaseStatistics* db_get_statistics(Database* db);
-TableStatistics* db_get_table_statistics(Database* db, const char* table_name);
-ErrorCode db_reset_statistics(Database* db);
+
+// Maintenance
 ErrorCode db_vacuum(Database* db);
 ErrorCode db_optimize(Database* db);
-int db_get_table_count(Database* db);
-int db_get_record_count(Database* db, const char* table_name);
-char** db_list_tables(Database* db, int* out_count);
-void db_print_schema(Database* db);
-void db_print_statistics(Database* db);
+ErrorCode db_reset_statistics(Database* db);
+
+// Query execution
+QueryResult* db_execute_query(Database* db, const char* query);
+
+// Utility
 const char* field_type_to_string(FieldType type);
 
-// Internal functions (for table operations)
+// Internal table functions
 ErrorCode table_insert_record(Table* table, Field* values, int* out_id);
 Record* table_find_record(Table* table, int id);
 ErrorCode table_update_record(Table* table, int id, Field* new_values);

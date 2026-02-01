@@ -1,10 +1,15 @@
 #ifndef JSON_IO_H
 #define JSON_IO_H
+#include "config.h"
+
+#include <stdio.h>     // For FILE
+#include <stdlib.h>    // For malloc, free
+#include <string.h>    // For string functions
+#include <time.h>      // For strptime
+#include <pthread.h>   // For pthread_rwlock_t
 
 #include "database.h"
-#include "config.h"
-#include <stdbool.h>
-#include <time.h>
+
 
 // ==================== JSON CONFIGURATION ====================
 
@@ -748,7 +753,9 @@ void json_transform_rule_free(JsonTransformRule* rule);
 // ==================== JSON MERGE & PATCH API ====================
 
 // Merging
-JsonValue* json_merge(JsonValue* base, JsonValue* overlay, JsonMergeStrategy strategy);
+JsonValue* json_merge(JsonValue* base, JsonValue* overlay, JsonMergeStrategy strategy) {
+    ...
+}
 JsonValue* json_merge_all(JsonValue** values, size_t count, JsonMergeStrategy strategy);
 JsonValue* json_merge_with_custom(JsonValue* base, JsonValue* overlay, JsonValue* (*merger)(JsonValue*, JsonValue*, void*), void* user_data);
 
@@ -972,7 +979,7 @@ ErrorCode json_parallel_serialize(JsonValue** values, size_t count, char*** resu
     do { \
         if ((ptr) == NULL) { \
             LOG_ERROR("NULL pointer at %s:%d", __FILE__, __LINE__); \
-            return ERROR_INVALID_INPUT; \
+            return NULL; \
         } \
     } while(0)
 

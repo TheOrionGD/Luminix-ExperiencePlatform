@@ -61,7 +61,8 @@ typedef enum {
 } ErrorCode;
 
 // ==================== DATA TYPES ====================
-typedef enum {
+// config.h
+typedef enum FieldType {
     TYPE_INT,
     TYPE_STRING,
     TYPE_FLOAT,
@@ -71,6 +72,10 @@ typedef enum {
     TYPE_BLOB,
     TYPE_NULL
 } FieldType;
+
+// database.h
+typedef enum FieldType FieldType; // forward declaration only
+
 
 // ==================== INDEX TYPES ====================
 typedef enum {

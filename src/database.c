@@ -36,6 +36,19 @@ typedef enum {
     QUERY_DROP_INDEX
 } QueryType;
 
+typedef enum {
+    TYPE_UNKNOWN = 0,   // <-- ADD THIS
+    TYPE_INT,
+    TYPE_STRING,
+    TYPE_FLOAT,
+    TYPE_DOUBLE,
+    TYPE_BOOL,
+    TYPE_DATETIME,
+    TYPE_BLOB,
+    TYPE_NULL
+} FieldType;
+
+
 // Complete Cache structure (simple stub)
 struct Cache {
     int policy;
@@ -82,7 +95,7 @@ static int generate_record_id(Table* table) {
 
 // Validate field value against type
 static ErrorCode validate_field_value(FieldType type, const char* value_str) {
-    if (!value_str) return ERROR_INVALID_INPUT;
+    if (!value_str) return NULL;
     
     switch (type) {
         case TYPE_INT: {
@@ -150,7 +163,7 @@ static ErrorCode validate_field_value(FieldType type, const char* value_str) {
 
 // Convert string to field value
 static ErrorCode string_to_field_value(Field* field, const char* value_str) {
-    if (!field || !value_str) return ERROR_INVALID_INPUT;
+    if (!field || !value_str) return NULL;
     
     ErrorCode validation = validate_field_value(field->type, value_str);
     if (validation != SUCCESS) return validation;
@@ -221,7 +234,7 @@ static Index* find_index_in_manager(IndexManager* manager, const char* table_nam
 
 // Add index to manager
 static ErrorCode add_index_to_manager(IndexManager* manager, Index* index) {
-    if (!manager || !index) return ERROR_INVALID_INPUT;
+    if (!manager || !index) return NULL;
     
     // Resize if needed
     if (manager->index_count >= manager->capacity) {
@@ -511,7 +524,7 @@ static void free_simple_query_result(QueryResult* result) {
 
 // Update indexes for a record
 static ErrorCode update_indexes_for_record(Table* table, Record* record, int old_id) {
-    if (!table || !record) return ERROR_INVALID_INPUT;
+    if (!table || !record) return NULL;
     
     IndexManager* manager = table->index_manager;
     if (!manager) return SUCCESS;  // No indexes to update
@@ -556,7 +569,7 @@ static ErrorCode update_indexes_for_record(Table* table, Record* record, int old
 
 // Remove indexes for a record
 static ErrorCode remove_indexes_for_record(Table* table, int record_id) {
-    if (!table) return ERROR_INVALID_INPUT;
+    if (!table) return NULL;
     
     IndexManager* manager = table->index_manager;
     if (!manager) return SUCCESS;
@@ -591,13 +604,13 @@ Database* db_create() {
     // Initialize transaction start time
     db->transaction_start_time = 0;
     
-    return db;
+    (void) db;
 }
 
 ErrorCode db_add_table(Database* db, const char* name, const char** field_names, 
                       FieldType* types, int field_count, Table** out_table) {
     if (!db || !name || !field_names || !types || field_count < 1 || field_count > MAX_FIELDS_PER_TABLE) {
-        return ERROR_INVALID_INPUT;
+        return NULL;
     }
     
     // Check if table already exists
@@ -638,7 +651,7 @@ ErrorCode db_add_table(Database* db, const char* name, const char** field_names,
     
     // Allocate field information
     table->field_names = (char**)malloc(field_count * sizeof(char*));
-    table->field_types = (FieldType*)malloc(field_count * sizeof(FieldType));
+    table->field_types = malloc(table->field_count * sizeof(FieldType)); // cast not needed in C
     table->constraints = (Constraint*)calloc(field_count, sizeof(Constraint));
     
     if (!table->field_names || !table->field_types || !table->constraints) {
@@ -706,7 +719,7 @@ Table* db_get_table(Database* db, const char* table_name) {
 // ==================== RECORD OPERATIONS ====================
 
 ErrorCode table_insert_record(Table* table, Field* values, int* out_id) {
-    if (!table || !values) return ERROR_INVALID_INPUT;
+    if (!table || !values) return NULL;
     
     // Check record count limit
     if (table->record_count >= MAX_RECORDS_PER_TABLE) {
@@ -715,7 +728,7 @@ ErrorCode table_insert_record(Table* table, Field* values, int* out_id) {
     
     // Validate field count
     if (values[0].type == TYPE_UNKNOWN) {
-        return ERROR_INVALID_INPUT;
+        return NULL;
     }
     
     // Check constraints
@@ -800,7 +813,7 @@ ErrorCode table_insert_record(Table* table, Field* values, int* out_id) {
 }
 
 ErrorCode db_insert_record(Database* db, const char* table_name, Field* values, int* out_id) {
-    if (!db || !table_name || !values) return ERROR_INVALID_INPUT;
+    if (!db || !table_name || !values) return NULL;
     
     Table* table = db_get_table(db, table_name);
     if (!table) {
@@ -831,7 +844,7 @@ ErrorCode db_insert_record(Database* db, const char* table_name, Field* values, 
 ErrorCode db_batch_insert_records(Database* db, const char* table_name, 
                                   Field** values_array, int count, int** out_ids) {
     if (!db || !table_name || !values_array || count < 1 || count > BATCH_INSERT_SIZE) {
-        return ERROR_INVALID_INPUT;
+        return NULL;
     }
     
     Table* table = db_get_table(db, table_name);
@@ -1087,7 +1100,7 @@ Record** db_find_all_records_by_field(Database* db, const char* table_name,
 }
 
 ErrorCode table_update_record(Table* table, int id, Field* new_values) {
-    if (!table || !new_values) return ERROR_INVALID_INPUT;
+    if (!table || !new_values) return NULL;
     
     Record* record = table_find_record(table, id);
     if (!record) {
@@ -1193,7 +1206,7 @@ ErrorCode table_update_record(Table* table, int id, Field* new_values) {
 }
 
 ErrorCode db_update_record(Database* db, const char* table_name, int id, Field* new_values) {
-    if (!db || !table_name || !new_values) return ERROR_INVALID_INPUT;
+    if (!db || !table_name || !new_values) return NULL;
     
     Table* table = db_get_table(db, table_name);
     if (!table) {
@@ -1222,7 +1235,7 @@ ErrorCode db_update_record(Database* db, const char* table_name, int id, Field* 
 }
 
 ErrorCode table_delete_record(Table* table, int id) {
-    if (!table) return ERROR_INVALID_INPUT;
+    if (!table) return NULL;
     
     Record* prev = NULL;
     Record* curr = table->records;
@@ -1259,7 +1272,7 @@ ErrorCode table_delete_record(Table* table, int id) {
 }
 
 ErrorCode db_delete_record(Database* db, const char* table_name, int id) {
-    if (!db || !table_name) return ERROR_INVALID_INPUT;
+    if (!db || !table_name) return NULL;
     
     Table* table = db_get_table(db, table_name);
     if (!table) {
@@ -1290,7 +1303,7 @@ ErrorCode db_delete_record(Database* db, const char* table_name, int id) {
 ErrorCode db_delete_records_by_field(Database* db, const char* table_name,
                                      const char* field_name, const void* value,
                                      int* out_count) {
-    if (!db || !table_name || !field_name || !value) return ERROR_INVALID_INPUT;
+    if (!db || !table_name || !field_name || !value) return NULL;
     
     if (out_count) *out_count = 0;
     
@@ -1423,7 +1436,7 @@ QueryResult* db_execute_query(Database* db, const char* query) {
 
 ErrorCode db_create_index(Database* db, const char* table_name, 
                          const char* field_name, IndexType type) {
-    if (!db || !table_name || !field_name) return ERROR_INVALID_INPUT;
+    if (!db || !table_name || !field_name) return NULL;
     
     Table* table = db_get_table(db, table_name);
     if (!table) {
@@ -1490,7 +1503,7 @@ ErrorCode db_create_index(Database* db, const char* table_name,
 }
 
 ErrorCode db_drop_index(Database* db, const char* table_name, const char* field_name) {
-    if (!db || !table_name || !field_name) return ERROR_INVALID_INPUT;
+    if (!db || !table_name || !field_name) return NULL;
     
     Table* table = db_get_table(db, table_name);
     if (!table) {
@@ -1508,7 +1521,7 @@ ErrorCode db_drop_index(Database* db, const char* table_name, const char* field_
 // ==================== TRANSACTION MANAGEMENT ====================
 
 ErrorCode db_begin_transaction(Database* db) {
-    if (!db) return ERROR_INVALID_INPUT;
+    if (!db) return NULL;
     
     if (db->transaction_active && db->transaction_level >= MAX_TRANSACTION_LEVEL) {
         return ERROR_TRANSACTION_CONFLICT;
@@ -1529,7 +1542,7 @@ ErrorCode db_begin_transaction(Database* db) {
 }
 
 ErrorCode db_commit_transaction(Database* db) {
-    if (!db) return ERROR_INVALID_INPUT;
+    if (!db) return NULL;
     
     if (!db->transaction_active) {
         return ERROR_TRANSACTION_CONFLICT;
@@ -1550,7 +1563,7 @@ ErrorCode db_commit_transaction(Database* db) {
 }
 
 ErrorCode db_rollback_transaction(Database* db) {
-    if (!db) return ERROR_INVALID_INPUT;
+    if (!db) return NULL;
     
     if (!db->transaction_active) {
         return ERROR_TRANSACTION_CONFLICT;
@@ -1583,7 +1596,7 @@ TableStatistics* db_get_table_statistics(Database* db, const char* table_name) {
 }
 
 ErrorCode db_reset_statistics(Database* db) {
-    if (!db) return ERROR_INVALID_INPUT;
+    if (!db) return NULL;
     
     if (db->statistics) {
         memset(db->statistics, 0, sizeof(DatabaseStatistics));
@@ -1601,7 +1614,7 @@ ErrorCode db_reset_statistics(Database* db) {
 // ==================== MAINTENANCE OPERATIONS ====================
 
 ErrorCode db_vacuum(Database* db) {
-    if (!db) return ERROR_INVALID_INPUT;
+    if (!db) return NULL;
     
     // Rebuild indexes
     for (int i = 0; i < db->table_count; i++) {
@@ -1627,7 +1640,7 @@ ErrorCode db_vacuum(Database* db) {
 }
 
 ErrorCode db_optimize(Database* db) {
-    if (!db) return ERROR_INVALID_INPUT;
+    if (!db) return NULL;
     
     update_simple_statistics(db->statistics, STAT_OPTIMIZATION_OPERATIONS, 1);
     

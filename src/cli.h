@@ -10,4 +10,3 @@ void cli_handle_command(const char* command);
 void cli_run(void);
 
 #endif
-EOF;

@@ -35,6 +35,30 @@ typedef struct {
     int vacuum_threshold;
     int max_connections;
 } DatabaseConfig;
+typedef struct {
+    long long tables_created;
+    long long records_inserted;
+    long long records_updated;
+    long long records_deleted;
+    long long queries_executed;
+    long long cache_hits;
+    long long cache_misses;
+    long long transactions_started;
+    long long transactions_committed;
+    long long transactions_rolled_back;
+    long long indexes_created;
+    long long indexes_dropped;
+    long long vacuum_operations;
+    long long optimization_operations;
+
+    // New fields to match main.c usage
+    double total_query_time;        // total time spent executing queries
+    size_t memory_used;             // current memory used by database
+    size_t peak_memory_used;        // peak memory usage
+    size_t cache_memory_used;       // memory used by query cache
+    int deadlocks_detected;         // number of deadlocks detected
+    int backup_operations;          // number of backup operations performed
+} DatabaseStatistics;
 
 // Statistics structure
 typedef struct {
@@ -86,8 +110,10 @@ int query_result_get_column_count(QueryResult* result);
 char* query_result_get_column_name(QueryResult* result, int col);
 FieldType query_result_get_column_type(QueryResult* result, int col);
 Field* query_result_get_field(QueryResult* result, int row, int col);
-Statistics* db_get_statistics(Database* db);
-TableStatisticsInternal* db_get_table_statistics(Database* db, const char* table_name);
+// database.h
+DatabaseStatistics* db_get_statistics(Database* db);
+
+TableStatistics* db_get_table_statistics(Database* db, const char* table_name);
 char* get_database_name(Database* db);
 char* get_database_path(Database* db);
 
@@ -2007,7 +2033,8 @@ void statistics_interactive() {
     printf("\nDatabase Statistics:\n");
     printf("====================\n");
     
-    Statistics* stats = db_get_statistics(g_database);
+    DatabaseStatistics* stats = db_get_statistics(g_database);
+
     if (stats) {
         printf("Operations:\n");
         printf("  Tables Created:    %lld\n", stats->tables_created);
@@ -3119,13 +3146,13 @@ Field* query_result_get_field(QueryResult* result, int row, int col) {
     return &dummy_field;
 }
 
-Statistics* db_get_statistics(Database* db) {
+DatabaseStatistics* db_get_statistics(Database* db){
     // TODO: Implement properly
-    static Statistics dummy_stats = {0};
+    static DatabaseStatistics dummy_stats = {0};
     return &dummy_stats;
 }
 
-TableStatisticsInternal* db_get_table_statistics(Database* db, const char* table_name) {
+TableStatistics* db_get_table_statistics(Database* db, const char* table_name) {
     // TODO: Implement properly
     return NULL;
 }

@@ -1,5 +1,13 @@
 #ifndef INDEX_H
 #define INDEX_H
+#include <pthread.h> // Add this at the top
+#include "database.h"
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
+#include <direct.h>   // For _mkdir
 
 #include "config.h"
 #include "threading.h"
@@ -7,7 +15,7 @@
 
 // ==================== FORWARD DECLARATIONS ====================
 typedef struct Index Index;
-typedef struct IndexManager IndexManager;
+//typedef struct IndexManager IndexManager;
 typedef struct HashIndex HashIndex;
 typedef struct BTreeIndex BTreeIndex;
 typedef struct SkipListIndex SkipListIndex;
@@ -20,21 +28,6 @@ typedef struct EnhancedBTree EnhancedBTree;
 typedef struct DeterministicSkipList DeterministicSkipList;
 typedef struct IndexStatistics IndexStatistics;
 typedef struct BenchmarkResult BenchmarkResult;
-
-// ==================== INDEX TYPES ====================
-typedef enum {
-    INDEX_NONE = 0,
-    INDEX_HASH,
-    INDEX_BTREE,
-    INDEX_SKIPLIST,
-    INDEX_BITMAP,
-    INDEX_FULLTEXT,
-    INDEX_SPATIAL,
-    INDEX_COMPOSITE,
-    INDEX_CONCURRENT_HASH,
-    INDEX_ENHANCED_BTREE,
-    INDEX_DETERMINISTIC_SKIPLIST
-} IndexType;
 
 // ==================== QUERY PATTERNS ====================
 typedef enum {
@@ -123,7 +116,7 @@ typedef struct BTreeNode {
     bool leaf;
     struct BTreeNode** children;
     struct BTreeNode* parent;
-    pthread_rwlock_t lock;
+    mutex_t lock;
     IndexStatistics stats;
 } BTreeNode;
 
@@ -132,7 +125,7 @@ typedef struct BTreeIndex {
     int t;                         // Minimum degree
     int size;
     FieldType key_type;
-    pthread_rwlock_t lock;
+    mutex_t lock;
     IndexStatistics stats;
 } BTreeIndex;
 
@@ -153,7 +146,7 @@ typedef struct SkipListIndex {
     int level;
     int size;
     double probability;
-    pthread_rwlock_t lock;
+    mutex_t lock;
     IndexStatistics stats;
 } SkipListIndex;
 
@@ -165,7 +158,7 @@ typedef struct BitmapIndex {
     Table* table;
     char field_name[MAX_FIELD_LEN];
     FieldType field_type;
-    pthread_rwlock_t lock;
+    mutex_t lock;
     IndexStatistics stats;
     
     // For range queries
@@ -198,7 +191,7 @@ typedef struct FullTextIndex {
     int term_count;
     int total_documents;
     int total_occurrences;
-    pthread_rwlock_t lock;
+    mutex_t lock;
     IndexStatistics stats;
     
     // Configuration
@@ -242,7 +235,7 @@ typedef struct SpatialIndexNode {
     } data;
     
     struct SpatialIndexNode* parent;
-    pthread_rwlock_t lock;
+    mutex_t lock;
 } SpatialIndexNode;
 
 typedef struct SpatialIndex {
@@ -250,7 +243,7 @@ typedef struct SpatialIndex {
     int node_count;
     int max_capacity;
     int min_capacity;
-    pthread_rwlock_t lock;
+    mutex_t lock;
     IndexStatistics stats;
     
     // Configuration
@@ -281,7 +274,7 @@ typedef struct CompositeIndex {
         void* custom;
     } impl;
     
-    pthread_rwlock_t lock;
+    mutex_t lock;
     IndexStatistics stats;
 } CompositeIndex;
 
@@ -302,7 +295,7 @@ typedef struct EnhancedBTreeNode {
     bool leaf;
     struct EnhancedBTreeNode** children;
     struct EnhancedBTreeNode* parent;
-    pthread_rwlock_t lock;
+    mutex_t lock;
     IndexStatistics stats;
     
     // Additional features
@@ -316,7 +309,7 @@ typedef struct EnhancedBTree {
     int t;
     int size;
     FieldType key_type;
-    pthread_rwlock_t lock;
+    mutex_t lock;
     IndexStatistics stats;
     
     // Cache
@@ -346,7 +339,7 @@ typedef struct DeterministicSkipList {
     int max_level;
     int level;
     int size;
-    pthread_rwlock_t lock;
+    mutex_t lock;
     IndexStatistics stats;
     
     // Deterministic properties
@@ -368,25 +361,31 @@ typedef struct IndexEntry {
 } IndexEntry;
 
 typedef struct IndexManager {
-    IndexEntry** hash_table;       // For quick lookup
-    IndexEntry* entries;           // Linked list of all entries
+    IndexEntry** hash_table;       
+    IndexEntry* entries;           
     int count;
     int capacity;
-    pthread_rwlock_t lock;
-    
+    mutex_t lock;
+
     // Statistics
     IndexStatistics global_stats;
-    
+
     // Configuration
     int max_indexes;
     bool auto_maintenance;
     int maintenance_interval;
-    
+
     // Cache
     Index** recent_indexes;
     int recent_count;
     int recent_capacity;
+
+    // New main index array to match old code
+    Index** indexes;
+    int index_count;
+    int index_capacity;
 } IndexManager;
+
 
 // ==================== BENCHMARK STRUCTURES ====================
 typedef struct BenchmarkConfig {
@@ -459,7 +458,7 @@ ErrorCode index_bulk_insert(Index* index, int* keys, Record** records, int count
 ErrorCode index_bulk_delete(Index* index, int* keys, int count);
 ErrorCode index_bulk_update(Index* index, int* old_keys, int* new_keys, 
                            Record** records, int count);
-
+typedef int (*ComparatorFunc)(const void*, const void*);
 // Range Queries
 Record** index_range_query(Index* index, int start_key, int end_key, 
                           int* out_count);
@@ -467,7 +466,7 @@ Record** index_range_query_ex(Index* index, void* start_key, void* end_key,
                              int* out_count, ComparatorFunc comparator);
 Record** index_prefix_query(Index* index, const char* prefix, int* out_count);
 Record** index_suffix_query(Index* index, const char* suffix, int* out_count);
-
+typedef struct FullTextSearchOptions FullTextSearchOptions;
 // Full-Text Search
 Record** fulltext_search(Index* index, const char* query, int* out_count);
 Record** fulltext_search_ex(Index* index, const char* query, 
@@ -580,6 +579,33 @@ ErrorCode composite_index_insert(CompositeIndex* index, Field* fields,
 Record* composite_index_search(CompositeIndex* index, Field* fields);
 
 // ==================== INDEX MANAGER API ====================
+IndexManager* index_manager_create() {
+    IndexManager* manager = malloc(sizeof(IndexManager));
+    if (!manager) return NULL;
+
+    // Initialize fields
+    manager->count = 0;
+    manager->capacity = 16;
+    manager->hash_table = malloc(sizeof(IndexEntry*) * manager->capacity);
+    manager->entries = NULL;
+
+    // Cache initialization
+    manager->recent_capacity = 16;
+    manager->recent_count = 0;
+    manager->recent_indexes = malloc(sizeof(Index*) * manager->recent_capacity);
+
+    // New indexes array
+    manager->index_capacity = 16;
+    manager->index_count = 0;
+    manager->indexes = malloc(sizeof(Index*) * manager->index_capacity);
+
+    // Other fields
+    manager->max_indexes = 100;       // example
+    manager->auto_maintenance = true; // example
+    manager->maintenance_interval = 3600; // example: 1 hour
+    mutex_init(&manager->lock);       // pseudo code for your mutex
+    return manager;
+}
 
 // Lifecycle
 IndexManager* index_manager_create();
@@ -783,7 +809,7 @@ typedef struct IndexCache {
     IndexCacheEntry* tail;
     size_t capacity;
     size_t size;
-    pthread_rwlock_t lock;
+    mutex_t lock;
     
     // Statistics
     long long hits;
@@ -869,7 +895,6 @@ ErrorCode index_transaction_update(IndexTransaction* trans, void* old_key,
 
 // ==================== INDEX COMPRESSION ====================
 typedef enum {
-    COMPRESSION_NONE = 0,
     COMPRESSION_LZ4,
     COMPRESSION_ZSTD,
     COMPRESSION_SNAPPY,
@@ -895,7 +920,6 @@ ErrorCode index_disable_compression(Index* index);
 
 // ==================== INDEX ENCRYPTION ====================
 typedef enum {
-    ENCRYPTION_NONE = 0,
     ENCRYPTION_AES_256,
     ENCRYPTION_CHACHA20
 } IndexEncryptionType;
@@ -930,7 +954,7 @@ typedef struct PartitionedIndex {
     IndexPartition* partitions;
     int partition_count;
     ComparatorFunc comparator;
-    pthread_rwlock_t lock;
+    mutex_t lock;
     
     // Partitioning strategy
     int (*partition_func)(void* key, int partition_count);
@@ -961,7 +985,7 @@ typedef struct ReplicatedIndex {
     Index* primary;
     IndexReplica* replicas;
     int replica_count;
-    pthread_rwlock_t lock;
+    mutex_t lock;
     
     // Replication settings
     bool async_replication;
@@ -1061,7 +1085,7 @@ typedef struct IndexRegistry {
     IndexPlugin** plugins;
     int plugin_count;
     int plugin_capacity;
-    pthread_rwlock_t lock;
+    mutex_t lock;
 } IndexRegistry;
 
 IndexRegistry* index_registry_get();

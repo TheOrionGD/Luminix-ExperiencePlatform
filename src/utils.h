@@ -18,7 +18,7 @@
 #define MAX_DATABASE_NAME_LEN 64
 #define MAX_PATH_LEN 256
 #define MAX_QUERY_LEN 4096
-#define INITIAL_CAPACITY 16
+#define INITIAL_CAPACITY 100
 
 // Color codes
 extern const char *COLOR_RESET;

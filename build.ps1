@@ -1,4 +1,4 @@
-echo "Building Luminix..."
+Write-Output "Building Luminix..."
 
 # Core files that should compile
 $files = @(
@@ -13,18 +13,18 @@ $files = @(
 gcc -I./src $files -o luminix.exe -lm
 
 if ($LASTEXITCODE -eq 0) {
-    echo "Build successful!"
+    Write-Output "Build successful!"
     .\luminix.exe
 } else {
-    echo "Build failed!"
-    echo "Trying with reduced warnings..."
+    Write-Output "Build failed!"
+    Write-Output "Trying with reduced warnings..."
     
     # Try with fewer warnings
     gcc -I./src -w $files -o luminix.exe -lm
     if ($LASTEXITCODE -eq 0) {
-        echo "Build successful with warnings suppressed!"
+        Write-Output "Build successful with warnings suppressed!"
         .\luminix.exe
     } else {
-        echo "Build still failed!"
+        Write-Output "Build still failed!"
     }
 }
