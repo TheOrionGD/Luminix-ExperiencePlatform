@@ -1,4 +1,5 @@
 #include "utils.h"
+#include "config.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -7,6 +8,18 @@
 #include <sys/stat.h>
 #include <dirent.h>
 #include <errno.h>
+#include <stdarg.h>
+
+#ifdef _WIN32
+#include <windows.h>
+#include <direct.h>
+#include <io.h>
+#include <conio.h>
+#else
+#include <unistd.h>
+#include <sys/ioctl.h>
+#include <sys/time.h>
+#endif
 
 // Color codes
 const char *COLOR_RESET = "\033[0m";
@@ -46,7 +59,7 @@ char* to_lower_case(char* str) {
     if (str == NULL) return NULL;
     
     for (int i = 0; str[i]; i++) {
-        str[i] = tolower(str[i]);
+        str[i] = tolower((unsigned char)str[i]);
     }
     
     return str;
@@ -56,7 +69,7 @@ char* to_upper_case(char* str) {
     if (str == NULL) return NULL;
     
     for (int i = 0; str[i]; i++) {
-        str[i] = toupper(str[i]);
+        str[i] = toupper((unsigned char)str[i]);
     }
     
     return str;
@@ -321,6 +334,52 @@ int delete_file(const char* filename) {
     return remove(filename) == 0;
 }
 
+int copy_directory(const char* source, const char* destination) {
+    if (source == NULL || destination == NULL) return 0;
+    
+    // Create destination directory
+    if (!create_directory(destination)) {
+        return 0;
+    }
+    
+    DIR* dir = opendir(source);
+    if (dir == NULL) return 0;
+    
+    struct dirent* entry;
+    
+    while ((entry = readdir(dir)) != NULL) {
+        if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) {
+            continue;
+        }
+        
+        char source_path[512];
+        char dest_path[512];
+        
+        snprintf(source_path, sizeof(source_path), "%s/%s", source, entry->d_name);
+        snprintf(dest_path, sizeof(dest_path), "%s/%s", destination, entry->d_name);
+        
+        struct stat stat_buf;
+        stat(source_path, &stat_buf);
+        
+        if (S_ISDIR(stat_buf.st_mode)) {
+            // Recursively copy directory
+            if (!copy_directory(source_path, dest_path)) {
+                closedir(dir);
+                return 0;
+            }
+        } else {
+            // Copy file
+            if (!copy_file(source_path, dest_path)) {
+                closedir(dir);
+                return 0;
+            }
+        }
+    }
+    
+    closedir(dir);
+    return 1;
+}
+
 // ==================== Memory Management Utilities ====================
 
 void* safe_malloc(size_t size) {
@@ -395,9 +454,30 @@ time_t parse_timestamp(const char* timestamp_str) {
     if (timestamp_str == NULL) return 0;
     
     struct tm tm = {0};
-    if (strptime(timestamp_str, "%Y-%m-%d %H:%M:%S", &tm) != NULL) {
-        return mktime(&tm);
-    }
+    
+    // Manual parsing for Windows (strptime is not available on Windows)
+    #ifdef _WIN32
+        int year, month, day, hour, minute, second;
+        if (sscanf(timestamp_str, "%d-%d-%d %d:%d:%d", 
+                  &year, &month, &day, &hour, &minute, &second) == 6) {
+            tm.tm_year = year - 1900;
+            tm.tm_mon = month - 1;
+            tm.tm_mday = day;
+            tm.tm_hour = hour;
+            tm.tm_min = minute;
+            tm.tm_sec = second;
+            tm.tm_isdst = -1;
+            
+            return mktime(&tm);
+        }
+    #else
+        // For Unix/Linux, we can use strptime if available
+        // Note: strptime is POSIX, not standard C
+        // Some systems might not have it
+        if (strptime(timestamp_str, "%Y-%m-%d %H:%M:%S", &tm) != NULL) {
+            return mktime(&tm);
+        }
+    #endif
     
     return 0;
 }
@@ -551,7 +631,7 @@ int is_date(const char* str) {
     
     for (int i = 0; i < 10; i++) {
         if (i == 4 || i == 7) continue;
-        if (!isdigit(str[i])) return 0;
+        if (!isdigit((unsigned char)str[i])) return 0;
     }
     
     return 1;
@@ -607,11 +687,11 @@ int validate_table_name(const char* name) {
     if (strlen(name) > MAX_TABLE_NAME_LEN) return 0;
     
     // Check first character
-    if (!isalpha(name[0]) && name[0] != '_') return 0;
+    if (!isalpha((unsigned char)name[0]) && name[0] != '_') return 0;
     
     // Check remaining characters
     for (size_t i = 1; i < strlen(name); i++) {
-        if (!isalnum(name[i]) && name[i] != '_') {
+        if (!isalnum((unsigned char)name[i]) && name[i] != '_') {
             return 0;
         }
     }
@@ -899,62 +979,24 @@ int create_backup(const char* source_dir, const char* backup_dir) {
     
     // Compress backup
     char command[1024];
-    snprintf(command, sizeof(command), "tar -czf %s.tar.gz %s", backup_path, backup_path);
+    #ifdef _WIN32
+        snprintf(command, sizeof(command), "powershell Compress-Archive -Path \"%s\" -DestinationPath \"%s.zip\"", backup_path, backup_path);
+    #else
+        snprintf(command, sizeof(command), "tar -czf %s.tar.gz %s", backup_path, backup_path);
+    #endif
     
     int result = system(command);
     
     // Remove uncompressed backup
     char rm_command[512];
-    snprintf(rm_command, sizeof(rm_command), "rm -rf %s", backup_path);
+    #ifdef _WIN32
+        snprintf(rm_command, sizeof(rm_command), "rmdir /s /q \"%s\"", backup_path);
+    #else
+        snprintf(rm_command, sizeof(rm_command), "rm -rf %s", backup_path);
+    #endif
     system(rm_command);
     
     return result == 0;
-}
-
-int copy_directory(const char* source, const char* destination) {
-    if (source == NULL || destination == NULL) return 0;
-    
-    // Create destination directory
-    if (!create_directory(destination)) {
-        return 0;
-    }
-    
-    DIR* dir = opendir(source);
-    if (dir == NULL) return 0;
-    
-    struct dirent* entry;
-    
-    while ((entry = readdir(dir)) != NULL) {
-        if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) {
-            continue;
-        }
-        
-        char source_path[512];
-        char dest_path[512];
-        
-        snprintf(source_path, sizeof(source_path), "%s/%s", source, entry->d_name);
-        snprintf(dest_path, sizeof(dest_path), "%s/%s", destination, entry->d_name);
-        
-        struct stat stat_buf;
-        stat(source_path, &stat_buf);
-        
-        if (S_ISDIR(stat_buf.st_mode)) {
-            // Recursively copy directory
-            if (!copy_directory(source_path, dest_path)) {
-                closedir(dir);
-                return 0;
-            }
-        } else {
-            // Copy file
-            if (!copy_file(source_path, dest_path)) {
-                closedir(dir);
-                return 0;
-            }
-        }
-    }
-    
-    closedir(dir);
-    return 1;
 }
 
 // ==================== Miscellaneous Utilities ====================
@@ -970,26 +1012,78 @@ void sleep_ms(int milliseconds) {
 int get_terminal_width() {
     #ifdef _WIN32
         CONSOLE_SCREEN_BUFFER_INFO csbi;
-        GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE), &csbi);
-        return csbi.srWindow.Right - csbi.srWindow.Left + 1;
+        if (GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE), &csbi)) {
+            return csbi.srWindow.Right - csbi.srWindow.Left + 1;
+        }
+        return 80; // Default if can't get
     #else
         struct winsize w;
-        ioctl(STDOUT_FILENO, TIOCGWINSZ, &w);
-        return w.ws_col;
+        if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &w) == 0) {
+            return w.ws_col;
+        }
+        return 80; // Default if can't get
     #endif
 }
 
 int get_terminal_height() {
     #ifdef _WIN32
         CONSOLE_SCREEN_BUFFER_INFO csbi;
-        GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE), &csbi);
-        return csbi.srWindow.Bottom - csbi.srWindow.Top + 1;
+        if (GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE), &csbi)) {
+            return csbi.srWindow.Bottom - csbi.srWindow.Top + 1;
+        }
+        return 24; // Default if can't get
     #else
         struct winsize w;
-        ioctl(STDOUT_FILENO, TIOCGWINSZ, &w);
-        return w.ws_row;
+        if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &w) == 0) {
+            return w.ws_row;
+        }
+        return 24; // Default if can't get
     #endif
 }
+
+// Custom getline implementation for Windows compatibility
+#ifdef _WIN32
+static ssize_t getline(char** lineptr, size_t* n, FILE* stream) {
+    if (lineptr == NULL || n == NULL || stream == NULL) {
+        return -1;
+    }
+    
+    if (*lineptr == NULL) {
+        *n = 128;
+        *lineptr = (char*)malloc(*n);
+        if (*lineptr == NULL) {
+            return -1;
+        }
+    }
+    
+    size_t pos = 0;
+    int c;
+    
+    while ((c = fgetc(stream)) != EOF) {
+        if (pos + 1 >= *n) {
+            *n *= 2;
+            char* new_ptr = (char*)realloc(*lineptr, *n);
+            if (new_ptr == NULL) {
+                return -1;
+            }
+            *lineptr = new_ptr;
+        }
+        
+        (*lineptr)[pos++] = (char)c;
+        
+        if (c == '\n') {
+            break;
+        }
+    }
+    
+    if (pos == 0 && c == EOF) {
+        return -1;
+    }
+    
+    (*lineptr)[pos] = '\0';
+    return pos;
+}
+#endif
 
 char* read_line(FILE* stream) {
     char* line = NULL;
@@ -1155,18 +1249,20 @@ PerformanceTimer* start_timer() {
 double stop_timer(PerformanceTimer* timer) {
     if (timer == NULL) return 0.0;
     
+    double elapsed;
+    
     #ifdef _WIN32
         LARGE_INTEGER end, frequency;
         QueryPerformanceCounter(&end);
         QueryPerformanceFrequency(&frequency);
         
-        double elapsed = (double)(end.QuadPart - timer->start.QuadPart) / frequency.QuadPart;
+        elapsed = (double)(end.QuadPart - timer->start.QuadPart) / frequency.QuadPart;
     #else
         struct timespec end;
         clock_gettime(CLOCK_MONOTONIC, &end);
         
-        double elapsed = (end.tv_sec - timer->start.tv_sec) + 
-                        (end.tv_nsec - timer->start.tv_nsec) / 1e9;
+        elapsed = (end.tv_sec - timer->start.tv_sec) + 
+                 (end.tv_nsec - timer->start.tv_nsec) / 1e9;
     #endif
     
     free(timer);

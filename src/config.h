@@ -43,7 +43,7 @@
 typedef enum {
     SUCCESS = 0,
     ERROR_GENERIC = -1,
-    ERROR_NOT_FOUND = -2,
+    MY_ERROR_NOT_FOUND = -2,
     ERROR_DUPLICATE_KEY = -3,
     ERROR_INVALID_INPUT = -4,
     ERROR_MEMORY_ALLOCATION = -5,
@@ -57,7 +57,7 @@ typedef enum {
     ERROR_CONSTRAINT_VIOLATION = -13,
     ERROR_TRANSACTION_CONFLICT = -14,
     ERROR_DEADLOCK_DETECTED = -15,
-    ERROR_TIMEOUT = -16
+    MY_ERROR_TIMEOUT = -16
 } ErrorCode;
 
 // ==================== DATA TYPES ====================

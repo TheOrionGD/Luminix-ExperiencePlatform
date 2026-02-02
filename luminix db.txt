@@ -1,0 +1,88 @@
+
+PS S:\luminix> dir
+
+
+    Directory: S:\luminix
+
+
+Mode                 LastWriteTime         Length Name
+----                 -------------         ------ ----
+d-----        2026-02-01     15:06                -p
+d-----        2026-02-01     15:58                .vscode
+d-----        2026-02-01     15:06                backups
+d-----        2026-02-01     15:06                bin
+d-----        2026-02-01     15:06                build
+d-----        2026-02-01     15:06                config
+d-----        2026-02-01     15:06                docs
+d-----        2026-02-01     15:06                include
+d-----        2026-02-01     15:06                lib
+d-----        2026-02-01     17:22                src
+d-----        2026-02-01     15:00                tests
+-a----        2026-02-01     16:37            692 build.ps1
+-a----        2026-02-01     14:45          29659 database.json
+-a----        2026-01-31     11:54           1089 LICENSE
+-a----        2026-02-01     15:48            482 Makefile
+-a----        2026-02-01     15:13            141 minimal_test.c
+-a----        2026-01-31     13:38           6998 README.md
+-a----        2026-02-01     15:13          58156 test.exe
+
+
+PS S:\luminix> cd src
+PS S:\luminix\src> dir
+
+
+    Directory: S:\luminix\src
+
+
+Mode                 LastWriteTime         Length Name
+----                 -------------         ------ ----
+-a----        2026-02-01     14:56           1028 backup.c
+-a----        2026-02-01     15:47            289 backup.h
+-a----        2026-02-01     15:03            850 cli.c
+-a----        2026-02-01     18:06            162 cli.h
+-a----        2026-02-01     15:08            409 common.h
+-a----        2026-02-01     16:17          14190 config.h
+-a----        2026-02-01     16:26          56537 database.c
+-a----        2026-02-01     17:02           6702 database.h
+-a----        2026-02-01     14:57            742 export_import.c
+-a----        2026-02-01     15:47            344 export_import.h
+-a----        2026-02-01     17:21          16737 index.c
+-a----        2026-02-01     16:51          37668 index.h
+-a----        2026-02-01     17:22           9535 index.o
+-a----        2026-02-01     16:26          89141 json_io.c
+-a----        2026-02-01     16:29          40826 json_io.h
+-a----        2026-02-01     15:12           1308 luminix_types.h
+-a----        2026-02-01     16:57         118419 main.c
+-a----        2026-02-01     14:43         117410 main.c.backup
+-a----        2026-02-01     15:14            244 main_minimal.c
+-a----        2026-02-01     14:55            674 parser.c
+-a----        2026-02-01     15:47            626 parser.h
+-a----        2026-02-01     14:57            765 query_engine.c
+-a----        2026-02-01     15:47            390 query_engine.h
+-a----        2026-02-01     14:55            750 security.c
+-a----        2026-02-01     15:47            399 security.h
+-a----        2026-02-01     14:55            668 storage.c
+-a----        2026-02-01     15:47            491 storage.h
+-a----        2026-02-01     16:12           1353 threading.h
+-a----        2026-02-01     14:55            885 transaction.c
+-a----        2026-02-01     15:47            505 transaction.h
+-a----        2026-01-31     14:17          32298 utils.c
+-a----        2026-02-01     16:18           6428 utils.h
+
+
+PS S:\luminix\src> cd..
+PS S:\luminix> cd tests
+PS S:\luminix\tests> dir
+
+
+    Directory: S:\luminix\tests
+
+
+Mode                 LastWriteTime         Length Name
+----                 -------------         ------ ----
+-a----        2026-02-01     14:58            509 test_database.c
+-a----        2026-02-01     14:59            479 test_index.c
+-a----        2026-02-01     15:00            496 test_parser.c
+-a----        2026-02-01     15:00            572 test_runner.c
+-a----        2026-02-01     14:59            514 test_utils.c
+
