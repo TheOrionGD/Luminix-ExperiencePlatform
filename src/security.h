@@ -14,4 +14,3 @@ int security_hash(const char* input, char* output, size_t max_len);
 int security_validate_token(const char* token);
 
 #endif
-EOF;

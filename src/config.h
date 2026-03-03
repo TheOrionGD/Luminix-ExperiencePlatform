@@ -5,7 +5,40 @@
 #define DEFAULT_LOAD_FACTOR 0.75
 #define DEFAULT_SPATIAL_CAPACITY 100
 #define CONCURRENT_INDEXING true  // or false based on your configuration
+// config.h
+#ifndef CONFIG_H
+#define CONFIG_H
 
+// Database configuration
+#define DEFAULT_PAGE_SIZE 4096
+#define DEFAULT_CACHE_SIZE 1000
+#define DEFAULT_MAX_CONNECTIONS 10
+#define DEFAULT_AUTO_VACUUM false
+#define DEFAULT_ENABLE_QUERY_CACHE true
+#define DEFAULT_LOG_QUERIES false
+#define DEFAULT_TRANSACTION_TIMEOUT 30 // seconds
+
+// Storage configuration
+#define DATA_FILE_EXTENSION ".db"
+#define INDEX_FILE_EXTENSION ".idx"
+#define LOG_FILE_EXTENSION ".log"
+
+// Performance tuning
+#define ENABLE_INDEXING true
+#define ENABLE_CACHING true
+#define ENABLE_PARALLEL_QUERIES false
+#define MAX_QUERY_THREADS 4
+
+// Memory management
+#define MEMORY_POOL_SIZE 1024 * 1024 // 1MB
+#define MAX_MEMORY_USAGE 1024 * 1024 * 1024 // 1GB
+
+// Cache policies
+#define CACHE_LRU 0
+#define CACHE_FIFO 1
+#define CACHE_LFU 2
+
+#endif // CONFIG_H
 // Error codes (if not already defined)
 #define ERROR_INVALID_ARGUMENT -1
 #define ERROR_MEMORY -2

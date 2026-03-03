@@ -12,6 +12,38 @@
 #include <time.h>
 
 
+#include "database.h"
+#include <stdbool.h>
+
+// String utilities
+char* trim_whitespace(char* str);
+char** split_string(const char* str, const char* delimiter, int* count);
+void free_split_result(char** parts, int count);
+bool str_ends_with(const char* str, const char* suffix);
+bool str_starts_with(const char* str, const char* prefix);
+char* str_to_lower(char* str);
+char* str_to_upper(char* str);
+
+// Type conversion
+bool string_to_bool(const char* str);
+int string_to_int(const char* str);
+float string_to_float(const char* str);
+double string_to_double(const char* str);
+
+// Validation
+bool is_valid_identifier(const char* str);
+bool is_valid_table_name(const char* name);
+bool is_valid_field_name(const char* name);
+bool is_valid_index_name(const char* name);
+
+// Error handling
+const char* error_code_to_string(ErrorCode code);
+
+// Debugging
+void print_record(Record* record);
+void print_field(Field* field);
+void print_query_result(QueryResult* result);
+
 // Constants
 #define MAX_TABLE_NAME_LEN 64
 #define MAX_COLUMN_NAME_LEN 64

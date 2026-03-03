@@ -1,6 +1,8 @@
+// database.h
 #ifndef DATABASE_H
 #define DATABASE_H
 
+#include "types.h"
 #include "config.h"
 #include <stdbool.h>
 #include <time.h>
@@ -9,12 +11,23 @@
 // Constants
 #define MAX_FIELD_LEN 256
 #define MAX_TABLES 100
+#define MAX_FIELDS_PER_TABLE 50
+#define MAX_RECORDS_PER_TABLE 1000000
 #define MAX_INDEXES_PER_TABLE 10
 #define INITIAL_CAPACITY 100
 #define QUERY_CACHE_SIZE 100
 #define MAX_TRANSACTION_LEVEL 10
 #define DEFAULT_BTREE_DEGREE 3
 #define DEFAULT_SKIPLIST_MAX_LEVEL 16
+#define BATCH_INSERT_SIZE 1000
+#define MAX_FIELD_NAME 64
+#define MAX_TABLE_NAME 64
+#define MAX_INDEX_NAME 64
+
+// Cache policies
+#define CACHE_LRU 0
+#define CACHE_FIFO 1
+#define CACHE_LFU 2
 
 // Statistics constants
 typedef enum {
@@ -33,6 +46,55 @@ typedef enum {
     STAT_VACUUM_OPERATIONS,
     STAT_OPTIMIZATION_OPERATIONS
 } StatType;
+
+// Error codes
+typedef enum {
+    SUCCESS = 0,
+    ERROR_NOT_FOUND = -1,
+    ERROR_DUPLICATE_KEY = -2,
+    ERROR_MEMORY_ALLOCATION = -3,
+    ERROR_INVALID_PARAMETER = -4,
+    ERROR_TABLE_FULL = -5,
+    ERROR_TRANSACTION_CONFLICT = -6,
+    ERROR_TYPE_MISMATCH = -7,
+    ERROR_CONSTRAINT_VIOLATION = -8,
+    ERROR_INDEX_EXISTS = -9,
+    ERROR_NOT_IMPLEMENTED = -10
+} ErrorCode;
+
+// Field types
+typedef enum {
+    TYPE_UNKNOWN = 0,
+    TYPE_INT,
+    TYPE_STRING,
+    TYPE_FLOAT,
+    TYPE_DOUBLE,
+    TYPE_BOOL,
+    TYPE_DATETIME,
+    TYPE_BLOB,
+    TYPE_NULL
+} FieldType;
+
+// Index types
+typedef enum {
+    INDEX_HASH,
+    INDEX_BTREE,
+    INDEX_SKIPLIST,
+    INDEX_BITMAP,
+    INDEX_FULLTEXT
+} IndexType;
+
+// Query types
+typedef enum {
+    QUERY_SELECT,
+    QUERY_INSERT,
+    QUERY_UPDATE,
+    QUERY_DELETE,
+    QUERY_CREATE_TABLE,
+    QUERY_DROP_TABLE,
+    QUERY_CREATE_INDEX,
+    QUERY_DROP_INDEX
+} QueryType;
 
 // Forward declarations
 typedef struct Index Index;
@@ -78,6 +140,14 @@ typedef struct Record {
     struct Record* next;
 } Record;
 
+// Index structure
+struct Index {
+    char table_name[MAX_TABLE_NAME];
+    char field_name[MAX_FIELD_LEN];
+    IndexType type;
+    void* data;  // Implementation-specific data
+};
+
 // IndexManager structure
 struct IndexManager {
     Index** indices;
@@ -90,8 +160,8 @@ struct TableStatistics {
     long long records_inserted;
     long long records_updated;
     long long records_deleted;
-    long long queries_executed;
-    long long index_operations;
+    long long index_scans;
+    long long sequential_scans;
 };
 
 // Table structure
@@ -125,15 +195,39 @@ typedef struct {
     long long indexes_dropped;
     long long vacuum_operations;
     long long optimization_operations;
-
-    // Added fields for main.c compatibility
-    double total_query_time;      // Total query execution time
-    size_t memory_used;           // Current memory usage
-    size_t peak_memory_used;      // Peak memory usage
-    size_t cache_memory_used;     // Memory used by cache
-    int deadlocks_detected;       // Deadlocks detected
-    int backup_operations;        // Backup operations
+    double total_query_time;
+    size_t memory_used;
+    size_t peak_memory_used;
+    size_t cache_memory_used;
+    int deadlocks_detected;
+    int backup_operations;
 } DatabaseStatistics;
+
+// Cache structure
+struct Cache {
+    int policy;
+    int size;
+    void* data;
+};
+
+// ParsedQuery structure
+struct ParsedQuery {
+    QueryType type;
+    char* table_name;
+    char* field_name;
+    char* condition;
+    int int_value;
+    char* string_value;
+};
+
+// QueryResult structure
+struct QueryResult {
+    int row_count;
+    int column_count;
+    char** column_names;
+    FieldType* column_types;
+    Field** rows;
+};
 
 // Database structure
 typedef struct {
@@ -151,7 +245,9 @@ typedef struct {
 // ====================== Function Prototypes ====================== //
 
 // Database management
-Database* db_create();
+Database* db_create(void);
+Database* db_open(const char* path, const char* mode);
+ErrorCode db_close(Database* db);
 void db_free(Database* db);
 DatabaseStatistics* db_get_statistics(Database* db);
 TableStatistics* db_get_table_statistics(Database* db, const char* table_name);
