@@ -1,0 +1,725 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Luminix Platform</title>
+    <link rel="icon" type="image/png" href="team.png">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&family=Outfit:wght@400;700;900&family=Fira+Code:wght@400;500&display=swap"
+        rel="stylesheet">
+    <style>
+        :root {
+            --primary: #8b5cf6;
+            --secondary: #06b6d4;
+            --accent: #f43f5e;
+            --dark: #0f172a;
+            --darker: #020617;
+            --card-bg: rgba(30, 41, 59, 0.6);
+            --light: #f8fafc;
+            --glass: rgba(15, 23, 42, 0.8);
+            --glass-border: rgba(255, 255, 255, 0.1);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--darker);
+            color: var(--light);
+            line-height: 1.6;
+            overflow-x: hidden;
+        }
+
+        /* Dynamic Background */
+        .bg-mesh {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: -1;
+            background:
+                radial-gradient(circle at 0% 0%, rgba(139, 92, 246, 0.15) 0%, transparent 50%),
+                radial-gradient(circle at 100% 100%, rgba(6, 182, 212, 0.15) 0%, transparent 50%);
+            animation: pulseBg 10s ease-in-out infinite alternate;
+        }
+
+        @keyframes pulseBg {
+            0% {
+                transform: scale(1);
+                opacity: 0.8;
+            }
+
+            100% {
+                transform: scale(1.05);
+                opacity: 1;
+            }
+        }
+
+        header {
+            padding: 1.5rem 5%;
+            display: flex;
+            text-align: center;
+            justify-content: center;
+            align-items: center;
+            background: var(--glass);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--glass-border);
+            position: fixed;
+            width: 100%;
+            top: 0;
+            z-index: 100;
+        }
+
+        .logo {
+            font-family: 'Outfit', sans-serif;
+            font-size: 1.8rem;
+            font-weight: 900;
+            background: linear-gradient(to right, var(--primary), var(--secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            letter-spacing: -1px;
+        }
+
+        .nav-links a {
+            color: #cbd5e1;
+            text-decoration: none;
+            margin-left: 2rem;
+            font-weight: 600;
+            font-size: 0.95rem;
+            transition: color 0.3s;
+        }
+
+        .nav-links a:hover {
+            color: white;
+        }
+
+        /* General Section Styles */
+        section {
+            padding: 6rem 5%;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .section-title {
+            font-family: 'Outfit', sans-serif;
+            font-size: 3rem;
+            font-weight: 800;
+            margin-bottom: 1.5rem;
+            text-align: center;
+            background: linear-gradient(135deg, #fff, #94a3b8);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        /* Hero */
+        .hero {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            padding-top: 100px;
+        }
+
+        .hero h1 {
+            font-family: 'Outfit', sans-serif;
+            font-size: 4.5rem;
+            font-weight: 900;
+            line-height: 1.1;
+            margin-bottom: 1.5rem;
+        }
+
+        .hero p {
+            font-size: 1.25rem;
+            max-width: 700px;
+            color: #94a3b8;
+            margin-bottom: 2rem;
+        }
+
+        .disclaimer {
+            background: rgba(244, 63, 94, 0.1);
+            border: 1px solid rgba(244, 63, 94, 0.3);
+            color: #fda4af;
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            margin-bottom: 2rem;
+            display: inline-block;
+        }
+
+        /* Problem vs Solution */
+        .split-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 3rem;
+            margin-top: 3rem;
+        }
+
+        .card {
+            background: var(--card-bg);
+            border: 1px solid var(--glass-border);
+            padding: 2.5rem;
+            border-radius: 20px;
+            backdrop-filter: blur(10px);
+            transition: transform 0.3s;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+        }
+
+        .card h3 {
+            font-family: 'Outfit', sans-serif;
+            font-size: 1.8rem;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .card.problem h3 {
+            color: var(--accent);
+        }
+
+        .card.solution h3 {
+            color: var(--secondary);
+        }
+
+        .card p {
+            color: #cbd5e1;
+            margin-bottom: 1rem;
+        }
+
+        .card ul {
+            list-style: none;
+            color: #94a3b8;
+        }
+
+        .card ul li {
+            margin-bottom: 0.5rem;
+            position: relative;
+            padding-left: 1.5rem;
+        }
+
+        .card ul li::before {
+            content: '→';
+            position: absolute;
+            left: 0;
+            color: var(--primary);
+        }
+
+        /* Interactive Terminal */
+        .terminal-container {
+            margin-top: 4rem;
+            display: grid;
+            grid-template-columns: 300px 1fr;
+            gap: 2rem;
+            background: #0f172a;
+            border: 1px solid #334155;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+        }
+
+        .terminal-controls {
+            background: #1e293b;
+            padding: 2rem;
+            border-right: 1px solid #334155;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .terminal-controls h4 {
+            color: white;
+            font-family: 'Outfit';
+            margin-bottom: 1rem;
+        }
+
+        .action-btn {
+            background: transparent;
+            border: 1px solid var(--primary);
+            color: white;
+            padding: 0.75rem 1rem;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            text-align: left;
+            transition: all 0.2s;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .action-btn:hover,
+        .action-btn.active {
+            background: var(--primary);
+            box-shadow: 0 0 15px rgba(139, 92, 246, 0.4);
+        }
+
+        .terminal-window {
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .terminal-header {
+            background: #1e293b;
+            padding: 0.75rem 1rem;
+            display: flex;
+            gap: 8px;
+            border-bottom: 1px solid #334155;
+        }
+
+        .dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+        }
+
+        .dot.red {
+            background: #ef4444;
+        }
+
+        .dot.yellow {
+            background: #f59e0b;
+        }
+
+        .dot.green {
+            background: #10b981;
+        }
+
+        .terminal-body {
+            padding: 1.5rem;
+            font-family: 'Fira Code', monospace;
+            font-size: 0.9rem;
+            color: #a7f3d0;
+            flex-grow: 1;
+            overflow-y: auto;
+            max-height: 400px;
+        }
+
+        .log-line {
+            margin-bottom: 0.5rem;
+            opacity: 0;
+            animation: fadeIn 0.3s forwards;
+        }
+
+        .log-prompt {
+            color: #8b5cf6;
+            font-weight: bold;
+        }
+
+        .log-cmd {
+            color: white;
+        }
+
+        .log-info {
+            color: #94a3b8;
+        }
+
+        .log-success {
+            color: #10b981;
+        }
+
+        @keyframes fadeIn {
+            to {
+                opacity: 1;
+            }
+        }
+
+        /* Team Section */
+        .team-grid {
+            display: flex;
+            justify-content: center;
+            gap: 3rem;
+            margin-top: 3rem;
+            flex-wrap: wrap;
+        }
+
+        .team-member {
+            background: var(--card-bg);
+            border: 1px solid var(--glass-border);
+            padding: 2rem;
+            border-radius: 16px;
+            text-align: center;
+            width: 320px;
+            transition: transform 0.3s, box-shadow 0.3s;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .dev-story {
+            margin-top: 1.5rem;
+            padding-top: 1.5rem;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            font-size: 0.9rem;
+            color: #cbd5e1;
+            font-style: italic;
+            line-height: 1.6;
+        }
+
+        .team-member:hover {
+            transform: translateY(-10px);
+            box-shadow: 0 15px 30px rgba(139, 92, 246, 0.2);
+            border-color: var(--primary);
+        }
+
+        .avatar {
+            width: 80px;
+            height: 80px;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            border-radius: 50%;
+            margin: 0 auto 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2rem;
+            font-family: 'Outfit';
+            font-weight: 900;
+        }
+
+        .team-member h4 {
+            font-size: 1.2rem;
+            color: white;
+            margin-bottom: 0.5rem;
+        }
+
+        .team-member p {
+            color: var(--secondary);
+            font-size: 0.9rem;
+            font-weight: 600;
+        }
+
+        /* Responsive */
+        @media (max-width: 800px) {
+
+            .split-grid,
+            .terminal-container {
+                grid-template-columns: 1fr;
+            }
+
+            .hero h1 {
+                font-size: 3rem;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="bg-mesh"></div>
+
+    <header>
+        <div class="logo">LUMINIX</div>
+    </header>
+
+    <section class="hero" id="home">
+        <div class="disclaimer">
+            This webpage is a conceptual demonstration to help understand the Luminix system's purpose.
+        </div>
+        <h1>Redefining the Embedded Engine</h1>
+        <p>A pure C database system blending relational ACID integrity with zero-copy JSON NoSQL capabilities, designed
+            for the extreme edge.</p>
+    </section>
+
+    <section id="about">
+        <h2 class="section-title">The Problem & The Solution</h2>
+        <div class="split-grid">
+            <div class="card problem">
+                <h3><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path
+                            d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z">
+                        </path>
+                        <line x1="12" y1="9" x2="12" y2="13"></line>
+                        <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                    </svg> The Problem</h3>
+                <p>Modern applications require both structured queries (SQL) and unstructured flexibility (JSON).
+                    However, traditional massive-scale databases:</p>
+                <ul>
+                    <li>Demand massive memory footprints (JVMs, background runtimes).</li>
+                    <li>Suffer latency penalties when serializing/deserializing deeply nested JSON.</li>
+                    <li>Are too bloated to run on resource-constrained IoT edge devices.</li>
+                    <li>Force developers to choose between an RDBMS or a Document Store.</li>
+                </ul>
+            </div>
+            <div class="card solution">
+                <h3><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="20 6 9 17 4 12"></polyline>
+                    </svg> The Luminix Solution</h3>
+                <p>We built a monolithic kernel in raw C99 that fuses the two paradigms without the bloat:</p>
+                <ul>
+                    <li><strong>ACID Core:</strong> Slotted-page memory management with a robust Write-Ahead Log
+                        ensuring zero data corruption.</li>
+                    <li><strong>Zero-Copy JSON:</strong> A custom lexer that tokenizes JSON natively on disk, allowing
+                        direct access without memory hydration.</li>
+                    <li><strong>Minimal Footprint:</strong> Runs on less than 16MB of RAM. Zero dependencies. Compiles
+                        to a single executable (`luminix.exe`).</li>
+                </ul>
+            </div>
+        </div>
+    </section>
+
+    <section id="architecture">
+        <h2 class="section-title">Core Architecture</h2>
+        <div class="split-grid">
+            <div class="card">
+                <h3><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+                        <line x1="8" y1="21" x2="16" y2="21"></line>
+                        <line x1="12" y1="17" x2="12" y2="21"></line>
+                    </svg> Slotted-Page Storage</h3>
+                <p>Data is stored in customizable 8KB - 64KB pages using a slotted-page architecture. This prevents
+                    memory fragmentation and allows for O(1) tuple lookups via in-page directory offsets.</p>
+            </div>
+            <div class="card">
+                <h3><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                    </svg> ACID Transaction Manager</h3>
+                <p>We implement the ARIES recovery algorithm. Every transaction appends intentions to a Write-Ahead Log
+                    (WAL), ensuring full Atomicity, Consistency, Isolation, and Durability.</p>
+            </div>
+            <div class="card">
+                <h3><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+                    </svg> High-Speed Indexing</h3>
+                <p>Features dynamic workload-adapted indexes. B-Trees for range queries and sorting, Hash Maps for O(1)
+                    exact-match lookups, and Skip Lists for rapid in-memory concurrency.</p>
+            </div>
+            <div class="card">
+                <h3><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="3"></circle>
+                        <path
+                            d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z">
+                        </path>
+                    </svg> Zero-Copy JSON Subsystem</h3>
+                <p>JSON payloads are never converted into fat memory trees. A custom lexer tokenizes strings natively,
+                    enabling querying of nested data (e.g., `user.profile.age`) on the fly.</p>
+            </div>
+        </div>
+    </section>
+
+    <section id="security">
+        <h2 class="section-title">Advanced Security</h2>
+        <div class="split-grid">
+            <div class="card">
+                <h3><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                        <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                    </svg> Data at Rest Encryption</h3>
+                <p>The storage engine supports transparent page-level AES-256-GCM encryption. Data is only decrypted
+                    inside the volatile memory pool, ensuring that stolen physical hardware remains unreadable.</p>
+            </div>
+            <div class="card">
+                <h3><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                        <circle cx="12" cy="7" r="4"></circle>
+                    </svg> Role-Based Access Control</h3>
+                <p>Security is enforced at the query parsing layer. Luminix provides granular RBAC allowing privileges
+                    to be granted at the database, table, or even specific column level.</p>
+            </div>
+        </div>
+    </section>
+
+    <section id="why-c">
+        <h2 class="section-title">Why Pure C?</h2>
+        <div class="split-grid">
+            <div class="card">
+                <h3><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"></path>
+                    </svg> Zero Hidden Abstractions</h3>
+                <p>Unlike languages with Garbage Collectors (Java, Go) or heavy runtimes, C provides absolute
+                    deterministic control over memory layouts. Every byte of the Buffer Pool is meticulously accounted
+                    for, preventing unpredictable latency spikes caused by GC pauses.</p>
+            </div>
+            <div class="card">
+                <h3><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
+                        <polyline points="2 17 12 22 22 17"></polyline>
+                        <polyline points="2 12 12 17 22 12"></polyline>
+                    </svg> Pointer Arithmetic</h3>
+                <p>By leveraging direct pointer arithmetic and `mmap`, Luminix can traverse B-Tree nodes and parse
+                    nested JSON tokens in a zero-copy fashion. We don't allocate intermediary objects—we read directly
+                    from the memory-mapped file.</p>
+            </div>
+            <div class="card">
+                <h3><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+                        <line x1="8" y1="21" x2="16" y2="21"></line>
+                        <line x1="12" y1="17" x2="12" y2="21"></line>
+                    </svg> Extreme Portability</h3>
+                <p>C99 allows Luminix to be compiled for incredibly obscure architectures. From massive x86_64 servers
+                    to highly constrained ARM Cortex-M IoT devices running bare-metal, if it has a C compiler, it can
+                    run Luminix.</p>
+            </div>
+            <div class="card">
+                <h3><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M22 12h-4l-3 9L9 3l-3 9H2"></path>
+                    </svg> Predictable Performance</h3>
+                <p>In high-frequency trading and edge computing, average latency isn't enough—tail latency (P99) is
+                    critical. C allows us to guarantee microsecond latencies by eliminating background tasks and runtime
+                    overhead.</p>
+            </div>
+        </div>
+    </section>
+
+    <section id="demo">
+        <h2 class="section-title">See It In Action</h2>
+        <p style="text-align: center; color: #94a3b8; max-width: 600px; margin: 0 auto;">Simulate how Luminix solves
+            data operations via its native C-CLI.</p>
+
+        <div class="terminal-container">
+            <div class="terminal-controls">
+                <h4>System Actions</h4>
+                <button class="action-btn" onclick="runSim('boot')">
+                    1. Boot Engine <span>▶</span>
+                </button>
+                <button class="action-btn" onclick="runSim('insert')">
+                    2. Insert JSON Payload <span>▶</span>
+                </button>
+                <button class="action-btn" onclick="runSim('query')">
+                    3. Deep Query (B-Tree) <span>▶</span>
+                </button>
+                <button class="action-btn" onclick="runSim('memory')">
+                    4. Check Footprint <span>▶</span>
+                </button>
+            </div>
+
+            <div class="terminal-window">
+                <div class="terminal-header">
+                    <div class="dot red"></div>
+                    <div class="dot yellow"></div>
+                    <div class="dot green"></div>
+                </div>
+                <div class="terminal-body" id="term-output">
+                    <div class="log-line log-info">Welcome to Luminix Simulation Shell. Select an action from the left
+                        menu.</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section id="team">
+        <h2 class="section-title">The Engineering Team</h2>
+        <div class="team-grid">
+            <div class="team-member">
+                <div class="avatar">G</div>
+                <h4>Godfrey</h4>
+                <p>Core Architect</p>
+                <div class="dev-story">
+                    "I wanted to build an engine where we didn't have to compromise. Writing Luminix in pure C allowed
+                    us to squeeze every ounce of performance out of the CPU. Designing the core architecture and the
+                    zero-copy JSON parser was a massive challenge, but the microsecond latencies we achieved made it all
+                    worth it."
+                </div>
+            </div>
+            <div class="team-member">
+                <div class="avatar">HH</div>
+                <h4>Harihar</h4>
+                <p>Systems Engineer</p>
+                <div class="dev-story">
+                    "My goal was to ensure the system remained rock-solid under immense pressure. Implementing the
+                    ACID-compliant Transaction Manager and ensuring the Write-Ahead Log could recover from abrupt power
+                    failures was intense. We used Valgrind relentlessly to guarantee zero memory leaks."
+                </div>
+            </div>
+            <div class="team-member">
+                <div class="avatar">HP</div>
+                <h4>Hariprakash</h4>
+                <p>Storage/Index Dev</p>
+                <div class="dev-story">
+                    "Bridging the gap between disk I/O and volatile memory is where databases usually bottleneck. I
+                    focused on building the Slotted-Page architecture and dynamic B-Tree structures. Seeing our indexes
+                    seamlessly handle millions of rows on edge devices was a huge milestone."
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <script>
+        const terminal = document.getElementById('term-output');
+        let isRunning = false;
+
+        const scripts = {
+            boot: [
+                { text: "./luminix.exe --daemon --port 8080", type: "cmd" },
+                { text: "[INFO] Allocating memory pool (16MB)... OK", type: "info" },
+                { text: "[INFO] Loading Slotted Pages from disk... OK", type: "info" },
+                { text: "[INFO] Initializing Write-Ahead Log (WAL)... OK", type: "info" },
+                { text: "[SUCCESS] Luminix Engine running on localhost:8080", type: "success" }
+            ],
+            insert: [
+                { text: "INSERT INTO telemetry (device_id, payload) VALUES ('iot-edge-01', '{\"temp\": 24.5, \"sensors\": [\"motion\", \"light\"]}');", type: "cmd" },
+                { text: "[INFO] Acquiring Row Lock...", type: "info" },
+                { text: "[INFO] Zero-copy parsing JSON string...", type: "info" },
+                { text: "[INFO] Appending LSN to WAL...", type: "info" },
+                { text: "[SUCCESS] Query OK, 1 row affected (0.015ms)", type: "success" }
+            ],
+            query: [
+                { text: "SELECT payload.sensors FROM telemetry WHERE payload.temp > 20.0;", type: "cmd" },
+                { text: "[INFO] Using B-Tree Index on 'payload.temp'...", type: "info" },
+                { text: "[INFO] Fetching direct offsets without JSON deserialization...", type: "info" },
+                { text: "[SUCCESS] Result: [\"motion\", \"light\"] (0.008ms)", type: "success" }
+            ],
+            memory: [
+                { text: "SHOW SYSTEM STATUS;", type: "cmd" },
+                { text: "----------------------------------------", type: "info" },
+                { text: "Buffer Pool Usage : 2.4 MB / 16.0 MB", type: "success" },
+                { text: "Active Threads    : 1", type: "info" },
+                { text: "Transaction State : IDLE", type: "info" },
+                { text: "----------------------------------------", type: "info" }
+            ]
+        };
+
+        async function runSim(action) {
+            if (isRunning) return;
+            isRunning = true;
+
+            // Highlight button
+            document.querySelectorAll('.action-btn').forEach(btn => btn.classList.remove('active'));
+            event.currentTarget.classList.add('active');
+
+            // Clear terminal if too long
+            if (terminal.childElementCount > 15) {
+                terminal.innerHTML = '';
+            }
+
+            const lines = scripts[action];
+            for (let i = 0; i < lines.length; i++) {
+                await new Promise(r => setTimeout(r, 400 + Math.random() * 300));
+                appendLog(lines[i].text, lines[i].type);
+            }
+
+            isRunning = false;
+        }
+
+        function appendLog(text, type) {
+            const div = document.createElement('div');
+            div.className = 'log-line';
+
+            if (type === 'cmd') {
+                div.innerHTML = `<span class="log-prompt">luminix></span> <span class="log-cmd">${text}</span>`;
+            } else if (type === 'success') {
+                div.innerHTML = `<span class="log-success">${text}</span>`;
+            } else {
+                div.innerHTML = `<span class="log-info">${text}</span>`;
+            }
+
+            terminal.appendChild(div);
+            terminal.scrollTop = terminal.scrollHeight;
+        }
+    </script>
+</body>
+
+</html>

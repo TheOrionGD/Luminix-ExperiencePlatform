@@ -1,12 +1,20 @@
-CC = gcc
-CFLAGS = -I./include -I./src -Wall -Wextra
+CC = D:\MinGW-w64\mingw32\bin\gcc.exe
+CFLAGS = -I./include -I./src -w
 LDFLAGS =
 
 SRC = src/main.c \
       src/database.c \
       src/json_io.c \
       src/utils.c \
-      src/index.c
+      src/index.c \
+      src/backup.c \
+      src/cli.c \
+      src/export_import.c \
+      src/parser.c \
+      src/query_engine.c \
+      src/security.c \
+      src/storage.c \
+      src/transaction.c
 
 OBJ = $(SRC:.c=.o)
 EXEC = luminix.exe

@@ -24,7 +24,7 @@ typedef pthread_mutex_t mutex_t;
 // Simple thread creation
 static inline int thread_create(thread_t* thread, void* (*func)(void*), void* arg) {
 #ifdef _WIN32
-    *thread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)func, arg, 0, NULL);
+    *thread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)(uintptr_t)func, arg, 0, NULL);
     return *thread ? 0 : -1;
 #else
     return pthread_create(thread, NULL, func, arg);

@@ -6,24 +6,30 @@ $files = @(
     "src/database.c",
     "src/json_io.c", 
     "src/utils.c",
-    "src/index.c"
+    "src/index.c",
+    "src/backup.c",
+    "src/cli.c",
+    "src/export_import.c",
+    "src/parser.c",
+    "src/query_engine.c",
+    "src/security.c",
+    "src/storage.c",
+    "src/transaction.c"
 )
 
 # Compile with minimal warnings
-gcc -I./src $files -o luminix.exe -lm
+D:\MinGW-w64\mingw32\bin\gcc.exe -I./src $files -o luminix.exe -lm
 
 if ($LASTEXITCODE -eq 0) {
     Write-Output "Build successful!"
-    .\luminix.exe
 } else {
     Write-Output "Build failed!"
     Write-Output "Trying with reduced warnings..."
     
     # Try with fewer warnings
-    gcc -I./src -w $files -o luminix.exe -lm
+    D:\MinGW-w64\mingw32\bin\gcc.exe -I./src -w $files -o luminix.exe -lm
     if ($LASTEXITCODE -eq 0) {
         Write-Output "Build successful with warnings suppressed!"
-        .\luminix.exe
     } else {
         Write-Output "Build still failed!"
     }

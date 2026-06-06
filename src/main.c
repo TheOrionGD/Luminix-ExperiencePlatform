@@ -68,7 +68,7 @@ char* get_database_name(Database* db);
 char* get_database_path(Database* db);
 
 // ==================== GLOBAL VARIABLES ====================
-static Database* g_database = NULL;
+Database* g_database = NULL;
 static int g_running = 1;
 static pthread_mutex_t g_input_mutex = PTHREAD_MUTEX_INITIALIZER;
 static char g_history[100][MAX_QUERY_LEN];
@@ -2263,7 +2263,7 @@ void show_examples() {
     printf("\n3. Complex Queries:\n");
     printf("   SELECT name, COUNT(*) FROM users GROUP BY name\n");
     printf("   SELECT * FROM users ORDER BY name DESC\n");
-    printf("   SELECT * FROM users WHERE name LIKE 'A%'\n");
+    printf("   SELECT * FROM users WHERE name LIKE 'A%%'\n");
     
     printf("\n4. Import/Export:\n");
     printf("   \\i users.json                -- Import from JSON\n");

@@ -6,7 +6,6 @@
 *.obj
 src/*.o
 tests/*.o
-!luminix.exe
 
 # Database States & Runtime Data
 *.state.json
@@ -27,7 +26,14 @@ luminix.log
 *.user
 *.pdb
 
-# Local / Temp Files
+# Local / Temp / Build Files
 output.txt
 test_quick.exe
 /scratch/
+zig.zip
+zig-windows-*/
+zig-cache/
+dummy.c
+test.c
+build_output.txt
+gcc_out.txt

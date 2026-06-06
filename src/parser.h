@@ -5,16 +5,7 @@
 
 #ifndef PARSER_H
 #define PARSER_H
-#include "config.h"
-
-typedef enum {
-    QUERY_SELECT,
-    QUERY_INSERT,
-    QUERY_UPDATE,
-    QUERY_DELETE,
-    QUERY_CREATE,
-    QUERY_DROP
-} QueryType;
+#include "database.h"
 
 typedef struct {
     char* field;

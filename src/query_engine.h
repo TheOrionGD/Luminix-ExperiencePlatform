@@ -12,10 +12,10 @@ typedef struct {
     void* data;
     int row_count;
     int affected_rows;
-} QueryResult;
+} EngineQueryResult;
 
-QueryResult* query_execute(const char* query);
-void query_result_free(QueryResult* result);
+EngineQueryResult* query_execute(const char* query);
+void query_result_free(EngineQueryResult* result);
 int query_validate(const char* query);
 
 #endif
