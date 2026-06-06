@@ -753,9 +753,7 @@ void json_transform_rule_free(JsonTransformRule* rule);
 // ==================== JSON MERGE & PATCH API ====================
 
 // Merging
-JsonValue* json_merge(JsonValue* base, JsonValue* overlay, JsonMergeStrategy strategy) {
-    ...
-}
+JsonValue* json_merge(JsonValue* base, JsonValue* overlay, JsonMergeStrategy strategy);
 JsonValue* json_merge_all(JsonValue** values, size_t count, JsonMergeStrategy strategy);
 JsonValue* json_merge_with_custom(JsonValue* base, JsonValue* overlay, JsonValue* (*merger)(JsonValue*, JsonValue*, void*), void* user_data);
 

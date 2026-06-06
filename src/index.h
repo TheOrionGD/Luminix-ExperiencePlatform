@@ -458,7 +458,7 @@ ErrorCode index_bulk_insert(Index* index, int* keys, Record** records, int count
 ErrorCode index_bulk_delete(Index* index, int* keys, int count);
 ErrorCode index_bulk_update(Index* index, int* old_keys, int* new_keys, 
                            Record** records, int count);
-typedef int (*ComparatorFunc)(const void*, const void*);
+typedef int (*ComparatorFunc)(const void* a, const void* b, void* context);
 // Range Queries
 Record** index_range_query(Index* index, int start_key, int end_key, 
                           int* out_count);
@@ -579,34 +579,6 @@ ErrorCode composite_index_insert(CompositeIndex* index, Field* fields,
 Record* composite_index_search(CompositeIndex* index, Field* fields);
 
 // ==================== INDEX MANAGER API ====================
-IndexManager* index_manager_create() {
-    IndexManager* manager = malloc(sizeof(IndexManager));
-    if (!manager) return NULL;
-
-    // Initialize fields
-    manager->count = 0;
-    manager->capacity = 16;
-    manager->hash_table = malloc(sizeof(IndexEntry*) * manager->capacity);
-    manager->entries = NULL;
-
-    // Cache initialization
-    manager->recent_capacity = 16;
-    manager->recent_count = 0;
-    manager->recent_indexes = malloc(sizeof(Index*) * manager->recent_capacity);
-
-    // New indexes array
-    manager->index_capacity = 16;
-    manager->index_count = 0;
-    manager->indexes = malloc(sizeof(Index*) * manager->index_capacity);
-
-    // Other fields
-    manager->max_indexes = 100;       // example
-    manager->auto_maintenance = true; // example
-    manager->maintenance_interval = 3600; // example: 1 hour
-    mutex_init(&manager->lock);       // pseudo code for your mutex
-    return manager;
-}
-
 // Lifecycle
 IndexManager* index_manager_create();
 IndexManager* index_manager_create_ex(int max_indexes);
@@ -697,8 +669,8 @@ ErrorCode index_predict_performance(Index* index, QueryPattern pattern,
 ErrorCode index_measure_latency(Index* index, int iterations, 
                                double* avg_latency, double* p95, double* p99);
 
-// ==================== COMPARATOR FUNCTIONS ====================
-typedef int (*ComparatorFunc)(const void* a, const void* b, void* context);
+
+
 
 // Built-in comparators
 int compare_int(const void* a, const void* b, void* context);
@@ -895,10 +867,10 @@ ErrorCode index_transaction_update(IndexTransaction* trans, void* old_key,
 
 // ==================== INDEX COMPRESSION ====================
 typedef enum {
-    COMPRESSION_LZ4,
-    COMPRESSION_ZSTD,
-    COMPRESSION_SNAPPY,
-    COMPRESSION_BITPACK
+    INDEX_COMPRESSION_LZ4,
+    INDEX_COMPRESSION_ZSTD,
+    INDEX_COMPRESSION_SNAPPY,
+    INDEX_COMPRESSION_BITPACK
 } IndexCompressionType;
 
 typedef struct IndexCompression {
@@ -920,8 +892,8 @@ ErrorCode index_disable_compression(Index* index);
 
 // ==================== INDEX ENCRYPTION ====================
 typedef enum {
-    ENCRYPTION_AES_256,
-    ENCRYPTION_CHACHA20
+    INDEX_ENCRYPTION_AES_256,
+    INDEX_ENCRYPTION_CHACHA20
 } IndexEncryptionType;
 
 typedef struct IndexEncryption {

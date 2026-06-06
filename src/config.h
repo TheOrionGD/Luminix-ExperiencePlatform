@@ -45,7 +45,6 @@
 // ... other error codes
 // ==================== DATABASE CONFIGURATION ====================
 #define MAX_FIELD_LEN 256
-#define MAX_TABLE_NAME 50
 
 #define LOAD_FACTOR 0.75
 #define MAX_TABLES 100
@@ -72,53 +71,8 @@
 #define BATCH_INSERT_SIZE 100
 #define BUFFER_POOL_SIZE (10 * 1024 * 1024)  // 10MB
 
-// ==================== ERROR CODES ====================
-typedef enum {
-    SUCCESS = 0,
-    ERROR_GENERIC = -1,
-    MY_ERROR_NOT_FOUND = -2,
-    ERROR_DUPLICATE_KEY = -3,
-    ERROR_INVALID_INPUT = -4,
-    ERROR_MEMORY_ALLOCATION = -5,
-    ERROR_IO_OPERATION = -6,
-    ERROR_PERMISSION_DENIED = -7,
-    ERROR_CORRUPT_DATA = -8,
-    ERROR_TABLE_FULL = -9,
-    ERROR_INDEX_EXISTS = -10,
-    ERROR_INDEX_NOT_FOUND = -11,
-    ERROR_TYPE_MISMATCH = -12,
-    ERROR_CONSTRAINT_VIOLATION = -13,
-    ERROR_TRANSACTION_CONFLICT = -14,
-    ERROR_DEADLOCK_DETECTED = -15,
-    MY_ERROR_TIMEOUT = -16
-} ErrorCode;
-
-// ==================== DATA TYPES ====================
-// config.h
-typedef enum FieldType {
-    TYPE_INT,
-    TYPE_STRING,
-    TYPE_FLOAT,
-    TYPE_DOUBLE,
-    TYPE_BOOL,
-    TYPE_DATETIME,
-    TYPE_BLOB,
-    TYPE_NULL
-} FieldType;
-
-// database.h
-typedef enum FieldType FieldType; // forward declaration only
-
-
-// ==================== INDEX TYPES ====================
-typedef enum {
-    INDEX_NONE,
-    INDEX_HASH,
-    INDEX_BTREE,
-    INDEX_SKIPLIST,
-    INDEX_BITMAP,
-    INDEX_FULLTEXT
-} IndexType;
+// ==================== ERROR CODES & TYPES ====================
+#include "types.h"
 
 // ==================== STORAGE TYPES ====================
 typedef enum {
@@ -179,6 +133,8 @@ typedef enum {
 // ==================== CONCURRENCY SETTINGS ====================
 #define LOCK_TIMEOUT_MS 5000
 #define DEADLOCK_CHECK_INTERVAL 1000
+// Transaction settings
+#define MAX_TRANSACTION_LEVEL 10
 #define MAX_TRANSACTION_RETRIES 3
 #define DEFAULT_ISOLATION_LEVEL ISOLATION_READ_COMMITTED
 

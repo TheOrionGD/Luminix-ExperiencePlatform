@@ -11,6 +11,10 @@
 #include <errno.h>
 #include <sys/stat.h>
 #include <stdint.h>
+#include <dirent.h>
+#ifdef _WIN32
+#include <direct.h>
+#endif
 
 // ==================== INTERNAL MACROS ====================
 #define JSON_BUFFER_SIZE 4096
@@ -384,6 +388,86 @@ static void json_free_token(JsonToken* token) {
     }
 }
 
+static ErrorCode json_skip_token_value(JsonParseContext* ctx, JsonToken token) {
+    ErrorCode result = SUCCESS;
+    if (token.type == TOKEN_OBJECT_START) {
+        json_free_token(&token);
+        while (1) {
+            JsonToken key_token = json_parse_token(ctx);
+            if (key_token.type == TOKEN_OBJECT_END) {
+                json_free_token(&key_token);
+                break;
+            }
+            if (key_token.type == TOKEN_EOF || key_token.type == TOKEN_NONE) {
+                json_free_token(&key_token);
+                return ERROR_INVALID_INPUT;
+            }
+            if (key_token.type != TOKEN_STRING) {
+                json_free_token(&key_token);
+                return ERROR_INVALID_INPUT;
+            }
+            json_free_token(&key_token);
+            
+            JsonToken colon_token = json_parse_token(ctx);
+            if (colon_token.type != TOKEN_COLON) {
+                json_free_token(&colon_token);
+                return ERROR_INVALID_INPUT;
+            }
+            json_free_token(&colon_token);
+            
+            JsonToken val_token = json_parse_token(ctx);
+            result = json_skip_token_value(ctx, val_token);
+            if (result != SUCCESS) {
+                return result;
+            }
+            
+            JsonToken comma_or_end = json_parse_token(ctx);
+            if (comma_or_end.type == TOKEN_COMMA) {
+                json_free_token(&comma_or_end);
+                continue;
+            } else if (comma_or_end.type == TOKEN_OBJECT_END) {
+                json_free_token(&comma_or_end);
+                break;
+            } else {
+                json_free_token(&comma_or_end);
+                return ERROR_INVALID_INPUT;
+            }
+        }
+    } else if (token.type == TOKEN_ARRAY_START) {
+        json_free_token(&token);
+        while (1) {
+            JsonToken item_token = json_parse_token(ctx);
+            if (item_token.type == TOKEN_ARRAY_END) {
+                json_free_token(&item_token);
+                break;
+            }
+            if (item_token.type == TOKEN_EOF || item_token.type == TOKEN_NONE) {
+                json_free_token(&item_token);
+                return ERROR_INVALID_INPUT;
+            }
+            result = json_skip_token_value(ctx, item_token);
+            if (result != SUCCESS) {
+                return result;
+            }
+            
+            JsonToken comma_or_end = json_parse_token(ctx);
+            if (comma_or_end.type == TOKEN_COMMA) {
+                json_free_token(&comma_or_end);
+                continue;
+            } else if (comma_or_end.type == TOKEN_ARRAY_END) {
+                json_free_token(&comma_or_end);
+                break;
+            } else {
+                json_free_token(&comma_or_end);
+                return ERROR_INVALID_INPUT;
+            }
+        }
+    } else {
+        json_free_token(&token);
+    }
+    return SUCCESS;
+}
+
 // JSON serialization helpers
 static bool json_serialize_ensure_capacity(JsonSerializeState* state, size_t additional) {
     if (state->size + additional + 1 > state->capacity) {
@@ -503,9 +587,6 @@ static bool json_serialize_field_value(JsonSerializeState* state, const Field* f
 
 // Database serialization
 static bool json_serialize_database_metadata(JsonSerializeState* state, Database* db) {
-    if (!json_serialize_append(state, "{\n", 2)) return false;
-    state->indent_level++;
-    
     if (!json_serialize_indent(state)) return false;
     if (!json_serialize_append(state, "\"metadata\": {\n", 14)) return false;
     state->indent_level++;
@@ -513,7 +594,7 @@ static bool json_serialize_database_metadata(JsonSerializeState* state, Database
     // Database name
     if (!json_serialize_indent(state)) return false;
     if (!json_serialize_append(state, "\"name\": ", 8)) return false;
-    //if (!json_serialize_append_string(state, db->name)) return false;
+    if (!json_serialize_append_string(state, get_database_name(db))) return false;
     if (!json_serialize_append(state, ",\n", 2)) return false;
     
     // Version
@@ -537,10 +618,11 @@ static bool json_serialize_database_metadata(JsonSerializeState* state, Database
     char count_str[32];
     snprintf(count_str, sizeof(count_str), "%d", db->table_count);
     if (!json_serialize_append(state, count_str, strlen(count_str))) return false;
+    if (!json_serialize_append(state, "\n", 1)) return false;
     
     state->indent_level--;
     if (!json_serialize_indent(state)) return false;
-    if (!json_serialize_append(state, "},\n", 3)) return false;
+    if (!json_serialize_append(state, "}", 1)) return false;
     
     return true;
 }
@@ -762,6 +844,7 @@ static ErrorCode json_parse_database_metadata(JsonParseContext* ctx) {
         }
         
         char* key = token.value;
+        token.value = NULL;
         json_free_token(&token);
         
         token = json_parse_token(ctx);
@@ -780,10 +863,12 @@ static ErrorCode json_parse_database_metadata(JsonParseContext* ctx) {
         if (strcmp(key, "name") == 0 && token.type == TOKEN_STRING) {
             //strncpy(field.name, token.value, MAX_TABLE_NAME - 1);
             //field.name[MAX_TABLE_NAME - 1] = '\0';
+            json_free_token(&token);
+        } else {
+            json_skip_token_value(ctx, token);
         }
         
         free(key);
-        json_free_token(&token);
         
         token = json_parse_token(ctx);
         if (token.type == TOKEN_COMMA) {
@@ -806,13 +891,10 @@ static ErrorCode json_parse_database_metadata(JsonParseContext* ctx) {
 static ErrorCode json_parse_table_schema(JsonParseContext* ctx, Table** out_table) {
     JsonToken token = json_parse_token(ctx);
     
-    if (token.type != TOKEN_OBJECT_START) {
-        snprintf(ctx->error_msg, JSON_MAX_ERROR_MSG,
-                "Expected object start for schema, got token type %d", token.type);
+    if (token.type == TOKEN_OBJECT_START) {
         json_free_token(&token);
-        return ERROR_INVALID_INPUT;
+        token = json_parse_token(ctx);
     }
-    json_free_token(&token);
     
     char table_name[MAX_TABLE_NAME] = "";
     char** field_names = NULL;
@@ -821,8 +903,6 @@ static ErrorCode json_parse_table_schema(JsonParseContext* ctx, Table** out_tabl
     int field_capacity = 0;
     
     while (1) {
-        token = json_parse_token(ctx);
-        
         if (token.type == TOKEN_OBJECT_END) {
             json_free_token(&token);
             break;
@@ -835,6 +915,7 @@ static ErrorCode json_parse_table_schema(JsonParseContext* ctx, Table** out_tabl
         }
         
         char* key = token.value;
+        token.value = NULL;
         json_free_token(&token);
         
         token = json_parse_token(ctx);
@@ -906,6 +987,7 @@ static ErrorCode json_parse_table_schema(JsonParseContext* ctx, Table** out_tabl
                     }
                     
                     char* field_key = token.value;
+                    token.value = NULL;
                     json_free_token(&token);
                     
                     token = json_parse_token(ctx);
@@ -931,6 +1013,7 @@ static ErrorCode json_parse_table_schema(JsonParseContext* ctx, Table** out_tabl
                             goto cleanup_error;
                         }
                         field_name = json_strdup(token.value);
+                        json_free_token(&token);
                     } else if (strcmp(field_key, "type") == 0) {
                         if (token.type != TOKEN_STRING) {
                             snprintf(ctx->error_msg, JSON_MAX_ERROR_MSG,
@@ -941,11 +1024,12 @@ static ErrorCode json_parse_table_schema(JsonParseContext* ctx, Table** out_tabl
                             goto cleanup_error;
                         }
                         field_type = string_to_field_type(token.value);
+                        json_free_token(&token);
+                    } else {
+                        json_skip_token_value(ctx, token);
                     }
-                    // Ignore constraints for now
                     
                     free(field_key);
-                    json_free_token(&token);
                     
                     token = json_parse_token(ctx);
                     if (token.type == TOKEN_COMMA) {
@@ -999,10 +1083,22 @@ static ErrorCode json_parse_table_schema(JsonParseContext* ctx, Table** out_tabl
                     goto cleanup_error;
                 }
             }
+        } else if (strcmp(key, "schema") == 0) {
+            token = json_parse_token(ctx); // expect '{' (TOKEN_OBJECT_START)
+            if (token.type != TOKEN_OBJECT_START) {
+                snprintf(ctx->error_msg, JSON_MAX_ERROR_MSG, "Expected object start for schema");
+                free(key);
+                json_free_token(&token);
+                goto cleanup_error;
+            }
+            json_free_token(&token);
+            token = json_parse_token(ctx); // read first key inside schema
+            free(key);
+            continue;
         } else {
             // Skip other keys for now
             token = json_parse_token(ctx);
-            json_free_token(&token);
+            json_skip_token_value(ctx, token);
         }
         
         free(key);
@@ -1010,6 +1106,7 @@ static ErrorCode json_parse_table_schema(JsonParseContext* ctx, Table** out_tabl
         token = json_parse_token(ctx);
         if (token.type == TOKEN_COMMA) {
             json_free_token(&token);
+            token = json_parse_token(ctx);
             continue;
         } else if (token.type == TOKEN_OBJECT_END) {
             json_free_token(&token);
@@ -1106,7 +1203,15 @@ static Field json_parse_field_value(JsonParseContext* ctx, FieldType expected_ty
         case TYPE_DATETIME:
             if (token.type == TOKEN_STRING) {
                 struct tm tm = {0};
-                if (strptime(token.value, "%Y-%m-%d %H:%M:%S", &tm) != NULL) {
+                int year, mon, mday, hour, min, sec;
+                if (sscanf(token.value, "%d-%d-%d %d:%d:%d", 
+                          &year, &mon, &mday, &hour, &min, &sec) == 6) {
+                    tm.tm_year = year - 1900;
+                    tm.tm_mon = mon - 1;
+                    tm.tm_mday = mday;
+                    tm.tm_hour = hour;
+                    tm.tm_min = min;
+                    tm.tm_sec = sec;
                     time_t timestamp_val = mktime(&tm);
                     memcpy(&field.value, &timestamp_val, sizeof(time_t));
                 }
@@ -1194,6 +1299,7 @@ static ErrorCode json_parse_table_records(JsonParseContext* ctx, Table* table) {
             }
             
             char* key = token.value;
+            token.value = NULL;
             json_free_token(&token);
             
             token = json_parse_token(ctx);
@@ -1243,6 +1349,7 @@ static ErrorCode json_parse_table_records(JsonParseContext* ctx, Table* table) {
                     }
                     
                     char* field_key = token.value;
+                    token.value = NULL;
                     json_free_token(&token);
                     
                     token = json_parse_token(ctx);
@@ -1299,7 +1406,7 @@ static ErrorCode json_parse_table_records(JsonParseContext* ctx, Table* table) {
             } else {
                 // Skip metadata and other keys
                 token = json_parse_token(ctx);
-                json_free_token(&token);
+                json_skip_token_value(ctx, token);
             }
             
             free(key);
@@ -1362,8 +1469,8 @@ static ErrorCode json_parse_table_records(JsonParseContext* ctx, Table* table) {
 
 // Database serialization/deserialization
 ErrorCode db_save_to_file(Database* db, const char* filename, JsonSaveOptions* options) {
-    VALIDATE_PTR(db);
-    VALIDATE_PTR(filename);
+    if (!db) return ERROR_INVALID_INPUT;
+    if (!filename) return ERROR_INVALID_INPUT;
     
     LOG_DEBUG("Saving database to file: %s", filename);
     
@@ -1511,7 +1618,7 @@ ErrorCode db_save_to_file(Database* db, const char* filename, JsonSaveOptions* o
 }
 
 Database* db_load_from_file(const char* filename, JsonLoadOptions* options) {
-    VALIDATE_PTR(filename);
+    if (!filename) return NULL;
     
     LOG_DEBUG("Loading database from file: %s", filename);
     
@@ -1593,6 +1700,7 @@ Database* db_load_from_file(const char* filename, JsonLoadOptions* options) {
         }
         
         char* key = token.value;
+        token.value = NULL;
         json_free_token(&token);
         
         token = json_parse_token(&ctx);
@@ -1619,72 +1727,46 @@ Database* db_load_from_file(const char* filename, JsonLoadOptions* options) {
             json_free_token(&token);
             
             // Parse tables array
+            bool has_table_start = false;
             while (1) {
-                token = json_parse_token(&ctx);
-                if (token.type == TOKEN_ARRAY_END) {
+                if (!has_table_start) {
+                    token = json_parse_token(&ctx);
+                    if (token.type == TOKEN_ARRAY_END) {
+                        json_free_token(&token);
+                        break;
+                    }
+                    
+                    if (token.type != TOKEN_OBJECT_START) {
+                        LOG_ERROR("Invalid JSON: expected object for table");
+                        free(key);
+                        key = NULL;
+                        json_free_token(&token);
+                        result = ERROR_INVALID_INPUT;
+                        break;
+                    }
                     json_free_token(&token);
-                    break;
                 }
-                
-                if (token.type != TOKEN_OBJECT_START) {
-                    LOG_ERROR("Invalid JSON: expected object for table");
-                    free(key);
-                    json_free_token(&token);
-                    result = ERROR_INVALID_INPUT;
-                    break;
-                }
-                json_free_token(&token);
+                has_table_start = false;
                 
                 // Parse table
                 Table* table = NULL;
                 result = json_parse_table_schema(&ctx, &table);
                 if (result != SUCCESS) {
                     free(key);
+                    key = NULL;
                     break;
                 }
                 
-                // Check if we should parse records
+                // Check next token
                 token = json_parse_token(&ctx);
-                if (token.type == TOKEN_COMMA) {
-                    // Parse records
-                    token = json_parse_token(&ctx);
-                    if (token.type == TOKEN_STRING && strcmp(token.value, "records") == 0) {
-                        json_free_token(&token);
-                        
-                        token = json_parse_token(&ctx);
-                        if (token.type != TOKEN_COLON) {
-                            LOG_ERROR("Invalid JSON: expected colon after 'records'");
-                            free(key);
-                            json_free_token(&token);
-                            result = ERROR_INVALID_INPUT;
-                            break;
-                        }
-                        json_free_token(&token);
-                        
-                        result = json_parse_table_records(&ctx, table);
-                        if (result != SUCCESS) {
-                            free(key);
-                            break;
-                        }
-                        
-                        token = json_parse_token(&ctx);
-                    } else {
-                        // Skip unknown key
-                        json_free_token(&token);
-                        token = json_parse_token(&ctx); // colon
-                        json_free_token(&token);
-                        token = json_parse_token(&ctx); // value
-                        json_free_token(&token);
-                        token = json_parse_token(&ctx); // comma or object end
-                    }
-                }
-                
-                if (token.type == TOKEN_COMMA) {
+                if (token.type == TOKEN_ARRAY_END) {
+                    // Flat table format, last table
                     json_free_token(&token);
-                    continue;
+                    break;
                 } else if (token.type == TOKEN_OBJECT_END) {
+                    // Nested table schema ended, outer table ended (no records)
                     json_free_token(&token);
-                    
+                    // Consume array separator or end
                     token = json_parse_token(&ctx);
                     if (token.type == TOKEN_COMMA) {
                         json_free_token(&token);
@@ -1695,12 +1777,151 @@ Database* db_load_from_file(const char* filename, JsonLoadOptions* options) {
                     } else {
                         LOG_ERROR("Invalid JSON: expected comma or array end after table");
                         free(key);
+                        key = NULL;
+                        json_free_token(&token);
+                        result = ERROR_INVALID_INPUT;
+                        break;
+                    }
+                } else if (token.type == TOKEN_COMMA) {
+                    // Read next token to check if next table start or records key
+                    JsonToken next_token = json_parse_token(&ctx);
+                    if (next_token.type == TOKEN_OBJECT_START) {
+                        // Flat table format, next table starts
+                        json_free_token(&token); // comma
+                        json_free_token(&next_token); // {
+                        has_table_start = true;
+                        continue;
+                    } else if (next_token.type == TOKEN_ARRAY_END) {
+                        // Flat table format with trailing comma
+                        json_free_token(&token);
+                        json_free_token(&next_token);
+                        break;
+                    } else if (next_token.type == TOKEN_STRING) {
+                        // Sibling key in outer table (nested table format)
+                        char* sibling_key = next_token.value;
+                        JsonToken col_token = json_parse_token(&ctx);
+                        if (col_token.type != TOKEN_COLON) {
+                            LOG_ERROR("Invalid JSON: expected colon after key '%s'", sibling_key);
+                            free(sibling_key);
+                            next_token.value = NULL;
+                            json_free_token(&next_token);
+                            json_free_token(&col_token);
+                            json_free_token(&token);
+                            free(key);
+                            key = NULL;
+                            result = ERROR_INVALID_INPUT;
+                            break;
+                        }
+                        json_free_token(&col_token);
+                        
+                        if (strcmp(sibling_key, "records") == 0) {
+                            result = json_parse_table_records(&ctx, table);
+                        } else {
+                            JsonToken val_token = json_parse_token(&ctx);
+                            result = json_skip_token_value(&ctx, val_token);
+                        }
+                        free(sibling_key);
+                        next_token.value = NULL;
+                        json_free_token(&next_token);
+                        json_free_token(&token); // comma
+                        
+                        if (result != SUCCESS) {
+                            free(key);
+                            key = NULL;
+                            break;
+                        }
+                        
+                        // Parse any other sibling keys in outer table until TOKEN_OBJECT_END
+                        bool outer_done = false;
+                        while (!outer_done) {
+                            JsonToken sib_token = json_parse_token(&ctx);
+                            if (sib_token.type == TOKEN_OBJECT_END) {
+                                json_free_token(&sib_token);
+                                outer_done = true;
+                            } else if (sib_token.type == TOKEN_COMMA) {
+                                json_free_token(&sib_token);
+                                JsonToken k_token = json_parse_token(&ctx);
+                                if (k_token.type != TOKEN_STRING) {
+                                    LOG_ERROR("Invalid JSON: expected string key in table");
+                                    k_token.value = NULL;
+                                    json_free_token(&k_token);
+                                    free(key);
+                                    key = NULL;
+                                    result = ERROR_INVALID_INPUT;
+                                    break;
+                                }
+                                char* k_str = k_token.value;
+                                JsonToken c_token = json_parse_token(&ctx);
+                                if (c_token.type != TOKEN_COLON) {
+                                    LOG_ERROR("Invalid JSON: expected colon after key '%s'", k_str);
+                                    free(k_str);
+                                    k_token.value = NULL;
+                                    json_free_token(&k_token);
+                                    json_free_token(&c_token);
+                                    free(key);
+                                    key = NULL;
+                                    result = ERROR_INVALID_INPUT;
+                                    break;
+                                }
+                                json_free_token(&c_token);
+                                
+                                if (strcmp(k_str, "records") == 0) {
+                                    result = json_parse_table_records(&ctx, table);
+                                } else {
+                                    JsonToken val_token = json_parse_token(&ctx);
+                                    result = json_skip_token_value(&ctx, val_token);
+                                }
+                                free(k_str);
+                                k_token.value = NULL;
+                                json_free_token(&k_token);
+                                if (result != SUCCESS) {
+                                    free(key);
+                                    key = NULL;
+                                    break;
+                                }
+                            } else {
+                                LOG_ERROR("Invalid JSON: expected comma or object end in table");
+                                json_free_token(&sib_token);
+                                free(key);
+                                key = NULL;
+                                result = ERROR_INVALID_INPUT;
+                                break;
+                            }
+                        }
+                        
+                        if (result != SUCCESS) {
+                            break;
+                        }
+                        
+                        // Consume array separator or end
+                        token = json_parse_token(&ctx);
+                        if (token.type == TOKEN_COMMA) {
+                            json_free_token(&token);
+                            continue;
+                        } else if (token.type == TOKEN_ARRAY_END) {
+                            json_free_token(&token);
+                            break;
+                        } else {
+                            LOG_ERROR("Invalid JSON: expected comma or array end after table");
+                            free(key);
+                            key = NULL;
+                            json_free_token(&token);
+                            result = ERROR_INVALID_INPUT;
+                            break;
+                        }
+                    } else {
+                        LOG_ERROR("Invalid JSON: expected object start or records key");
+                        free(key);
+                        key = NULL;
+                        json_free_token(&token);
+                        json_free_token(&next_token);
                         result = ERROR_INVALID_INPUT;
                         break;
                     }
                 } else {
-                    LOG_ERROR("Invalid JSON: expected comma or object end in table");
+                    LOG_ERROR("Invalid JSON: expected comma, object end, or array end");
                     free(key);
+                    key = NULL;
                     json_free_token(&token);
                     result = ERROR_INVALID_INPUT;
                     break;
@@ -1709,7 +1930,12 @@ Database* db_load_from_file(const char* filename, JsonLoadOptions* options) {
         } else {
             // Skip unknown key
             token = json_parse_token(&ctx);
-            json_free_token(&token);
+            ErrorCode skip_res = json_skip_token_value(&ctx, token);
+            if (skip_res != SUCCESS) {
+                result = skip_res;
+                free(key);
+                break;
+            }
         }
         
         free(key);
@@ -1747,8 +1973,8 @@ Database* db_load_from_file(const char* filename, JsonLoadOptions* options) {
 
 // Record serialization
 char* record_to_json(Record* record, Table* table, JsonSerializeOptions* options) {
-    VALIDATE_PTR(record);
-    VALIDATE_PTR(table);
+    if (!record) return NULL;
+    if (!table) return NULL;
     
     JsonSerializeState state = {0};
     state.pretty = options ? options->pretty : false;
@@ -1888,9 +2114,9 @@ char* record_to_json(Record* record, Table* table, JsonSerializeOptions* options
     return state.buffer;
 }
 
-Record* json_to_record(const char* json_str, Table* table) {
-    VALIDATE_PTR(json_str);
-    VALIDATE_PTR(table);
+Record* json_to_record(const char* json_str, Table* table, JsonLoadOptions* options) {
+    if (!json_str) return NULL;
+    if (!table) return NULL;
     
     JsonParseContext ctx = {0};
     ctx.json = json_str;
@@ -1927,6 +2153,7 @@ Record* json_to_record(const char* json_str, Table* table) {
         }
         
         char* key = token.value;
+        token.value = NULL;
         json_free_token(&token);
         
         token = json_parse_token(&ctx);
@@ -1977,6 +2204,7 @@ Record* json_to_record(const char* json_str, Table* table) {
                 }
                 
                 char* field_key = token.value;
+                token.value = NULL;
                 json_free_token(&token);
                 
                 token = json_parse_token(&ctx);
@@ -2078,7 +2306,7 @@ Record* json_to_record(const char* json_str, Table* table) {
 
 // Table serialization
 char* table_to_json(Table* table, JsonSerializeOptions* options) {
-    VALIDATE_PTR(table);
+    if (!table) return NULL;
     
     JsonSerializeState state = {0};
     state.pretty = options ? options->pretty : true;
@@ -2131,9 +2359,9 @@ char* table_to_json(Table* table, JsonSerializeOptions* options) {
     return state.buffer;
 }
 
-Table* json_to_table(const char* json_str, Database* db) {
-    VALIDATE_PTR(json_str);
-    VALIDATE_PTR(db);
+Table* json_to_table(const char* json_str, Database* db, JsonLoadOptions* options) {
+    if (!json_str) return NULL;
+    if (!db) return NULL;
     
     JsonParseContext ctx = {0};
     ctx.json = json_str;
@@ -2175,7 +2403,7 @@ Table* json_to_table(const char* json_str, Database* db) {
 
 // JSON validation
 ErrorCode validate_json(const char* json_str, char** error_msg) {
-    VALIDATE_PTR(json_str);
+    if (!json_str) return ERROR_INVALID_INPUT;
     
     JsonParseContext ctx = {0};
     ctx.json = json_str;
@@ -2218,7 +2446,7 @@ ErrorCode validate_json(const char* json_str, char** error_msg) {
 
 // JSON pretty printing
 char* json_pretty_print(const char* json_str, int indent) {
-    VALIDATE_PTR(json_str);
+    if (!json_str) return NULL;
     
     // Simple pretty printer - in production, you'd want a more sophisticated one
     JsonSerializeOptions options = {0};
@@ -2295,9 +2523,9 @@ char* json_pretty_print(const char* json_str, int indent) {
 }
 
 // JSON merge
-char* json_merge(const char* json1, const char* json2, JsonMergeStrategy strategy) {
-    VALIDATE_PTR(json1);
-    VALIDATE_PTR(json2);
+char* json_merge_string(const char* json1, const char* json2, JsonMergeStrategy strategy) {
+    if (!json1) return NULL;
+    if (!json2) return NULL;
     
     // Parse both JSON strings
     JsonParseContext ctx1 = {0};
@@ -2321,9 +2549,9 @@ char* json_merge(const char* json1, const char* json2, JsonMergeStrategy strateg
 }
 
 // JSON path query (simplified)
-char* json_path_query(const char* json_str, const char* path) {
-    VALIDATE_PTR(json_str);
-    VALIDATE_PTR(path);
+char* json_path_query_string_simplified(const char* json_str, const char* path) {
+    if (!json_str) return NULL;
+    if (!path) return NULL;
     
     // Simplified JSON path implementation
     // In production, you'd want a full JSONPath implementation
@@ -2425,8 +2653,8 @@ char* json_path_query(const char* json_str, const char* path) {
 }
 
 // JSON statistics
-JsonStats* json_get_stats(const char* json_str) {
-    VALIDATE_PTR(json_str);
+JsonStats* json_get_stats_string(const char* json_str) {
+    if (!json_str) return NULL;
     
     JsonStats* stats = (JsonStats*)json_calloc(1, sizeof(JsonStats));
     if (!stats) {
@@ -2484,8 +2712,8 @@ void json_free_stats(JsonStats* stats) {
 }
 
 // File operations
-ErrorCode json_validate_file(const char* filename, char** error_msg) {
-    VALIDATE_PTR(filename);
+ErrorCode json_validate_file(const char* filename, JsonParseOptions* options, char** error_msg) {
+    if (!filename) return ERROR_INVALID_INPUT;
     
     FILE* file = fopen(filename, "rb");
     if (!file) {
@@ -2521,8 +2749,8 @@ ErrorCode json_validate_file(const char* filename, char** error_msg) {
 }
 
 // JSON compression
-char* json_compress(const char* json_str, JsonCompressionType type) {
-    VALIDATE_PTR(json_str);
+char* json_compress(const char* json_str, JsonCompressionType type, int level) {
+    if (!json_str) return NULL;
     
     // For now, just remove whitespace (minify)
     if (type == JSON_COMPRESS_MINIFY) {
@@ -2564,7 +2792,7 @@ char* json_compress(const char* json_str, JsonCompressionType type) {
 
 // JSON utilities
 char* json_get_type(const char* json_str) {
-    VALIDATE_PTR(json_str);
+    if (!json_str) return NULL;
     
     JsonParseContext ctx = {0};
     ctx.json = json_str;
@@ -2601,9 +2829,9 @@ char* json_get_type(const char* json_str) {
 }
 
 // JSON diff
-JsonDiff* json_diff(const char* json1, const char* json2) {
-    VALIDATE_PTR(json1);
-    VALIDATE_PTR(json2);
+JsonDiff* json_diff_string(const char* json1, const char* json2) {
+    if (!json1) return NULL;
+    if (!json2) return NULL;
     
     // Simplified diff - just compare strings
     JsonDiff* diff = (JsonDiff*)json_calloc(1, sizeof(JsonDiff));
@@ -2622,4 +2850,255 @@ void json_free_diff(JsonDiff* diff) {
     if (diff) {
         free(diff);
     }
+}
+
+ErrorCode db_create_backup(Database* db, const char* backup_dir, JsonSaveOptions* options) {
+    if (!db || !backup_dir) return ERROR_INVALID_INPUT;
+    
+#ifdef _WIN32
+    _mkdir(backup_dir);
+#else
+    mkdir(backup_dir, 0755);
+#endif
+
+    time_t now = time(NULL);
+    struct tm* t = localtime(&now);
+    char backup_path[512];
+    snprintf(backup_path, sizeof(backup_path), 
+             "%s/backup_%04d%02d%02d_%02d%02d%02d.json",
+             backup_dir,
+             t->tm_year + 1900, t->tm_mon + 1, t->tm_mday,
+             t->tm_hour, t->tm_min, t->tm_sec);
+             
+    return db_save_to_file(db, backup_path, options);
+}
+
+ErrorCode db_restore_backup(Database* db, const char* backup_file, JsonLoadOptions* options) {
+    if (!db || !backup_file) return ERROR_INVALID_INPUT;
+    
+    Database* loaded_db = db_load_from_file(backup_file, options);
+    if (!loaded_db) return ERROR_IO_OPERATION;
+    
+    // Free original db content
+    if (db->tables) {
+        for (int i = 0; i < db->table_count; i++) {
+            table_free(&db->tables[i]);
+        }
+        free(db->tables);
+    }
+    if (db->index_manager) {
+        index_manager_free(db->index_manager);
+    }
+    if (db->cache) {
+        if (db->cache->data) free(db->cache->data);
+        free(db->cache);
+    }
+    if (db->statistics) {
+        free(db->statistics);
+    }
+    
+    // Copy fields
+    db->tables = loaded_db->tables;
+    db->table_count = loaded_db->table_count;
+    db->table_capacity = loaded_db->table_capacity;
+    db->index_manager = loaded_db->index_manager;
+    db->cache = loaded_db->cache;
+    db->statistics = loaded_db->statistics;
+    db->transaction_active = loaded_db->transaction_active;
+    db->transaction_level = loaded_db->transaction_level;
+    db->transaction_start_time = loaded_db->transaction_start_time;
+    
+    // Free loaded wrapper
+    free(loaded_db);
+    return SUCCESS;
+}
+
+ErrorCode db_list_backups(const char* backup_dir, char*** backups, int* count) {
+    if (!backup_dir || !backups || !count) return ERROR_INVALID_INPUT;
+    
+    DIR* dir = opendir(backup_dir);
+    if (!dir) return ERROR_NOT_FOUND;
+    
+    int capacity = 16;
+    *backups = malloc(capacity * sizeof(char*));
+    *count = 0;
+    
+    struct dirent* entry;
+    while ((entry = readdir(dir)) != NULL) {
+        if (strstr(entry->d_name, "backup_") == entry->d_name) {
+            if (*count >= capacity) {
+                capacity *= 2;
+                *backups = realloc(*backups, capacity * sizeof(char*));
+            }
+            (*backups)[*count] = strdup(entry->d_name);
+            (*count)++;
+        }
+    }
+    closedir(dir);
+    return SUCCESS;
+}
+
+ErrorCode db_delete_backup(const char* backup_file) {
+    if (!backup_file) return ERROR_INVALID_INPUT;
+    if (remove(backup_file) == 0) return SUCCESS;
+    return ERROR_IO_OPERATION;
+}
+
+char* query_result_to_json(QueryResult* result, JsonSerializeOptions* options) {
+    if (!result) return NULL;
+    
+    JsonSerializeState state = {0};
+    state.pretty = options ? options->pretty : false;
+    state.sort_keys = options ? options->sort_keys : false;
+    state.capacity = JSON_BUFFER_SIZE;
+    state.buffer = (char*)json_malloc(state.capacity);
+    if (!state.buffer) return NULL;
+    state.buffer[0] = '\0';
+    
+    if (!json_serialize_append(&state, "{", 1)) {
+        free(state.buffer);
+        return NULL;
+    }
+    state.indent_level++;
+    
+    // Write row_count
+    if (state.pretty) {
+        if (!json_serialize_append(&state, "\n", 1) || !json_serialize_indent(&state)) {
+            free(state.buffer);
+            return NULL;
+        }
+    }
+    if (!json_serialize_append(&state, "\"row_count\": ", 13)) {
+        free(state.buffer);
+        return NULL;
+    }
+    char temp_str[32];
+    snprintf(temp_str, sizeof(temp_str), "%d", result->row_count);
+    if (!json_serialize_append(&state, temp_str, strlen(temp_str)) || !json_serialize_append(&state, ",", 1)) {
+        free(state.buffer);
+        return NULL;
+    }
+    
+    // Write column_count
+    if (state.pretty) {
+        if (!json_serialize_append(&state, "\n", 1) || !json_serialize_indent(&state)) {
+            free(state.buffer);
+            return NULL;
+        }
+    }
+    if (!json_serialize_append(&state, "\"column_count\": ", 16)) {
+        free(state.buffer);
+        return NULL;
+    }
+    snprintf(temp_str, sizeof(temp_str), "%d", result->column_count);
+    if (!json_serialize_append(&state, temp_str, strlen(temp_str)) || !json_serialize_append(&state, ",", 1)) {
+        free(state.buffer);
+        return NULL;
+    }
+    
+    // Write columns
+    if (state.pretty) {
+        if (!json_serialize_append(&state, "\n", 1) || !json_serialize_indent(&state)) {
+            free(state.buffer);
+            return NULL;
+        }
+    }
+    if (!json_serialize_append(&state, "\"columns\": [", 12)) {
+        free(state.buffer);
+        return NULL;
+    }
+    for (int i = 0; i < result->column_count; i++) {
+        if (i > 0) {
+            if (!json_serialize_append(&state, ", ", 2)) {
+                free(state.buffer);
+                return NULL;
+            }
+        }
+        if (!json_serialize_append(&state, "\"", 1) ||
+            !json_serialize_append(&state, result->column_names[i], strlen(result->column_names[i])) ||
+            !json_serialize_append(&state, "\"", 1)) {
+            free(state.buffer);
+            return NULL;
+        }
+    }
+    if (!json_serialize_append(&state, "],", 2)) {
+        free(state.buffer);
+        return NULL;
+    }
+    
+    // Write rows
+    if (state.pretty) {
+        if (!json_serialize_append(&state, "\n", 1) || !json_serialize_indent(&state)) {
+            free(state.buffer);
+            return NULL;
+        }
+    }
+    if (!json_serialize_append(&state, "\"rows\": [", 9)) {
+        free(state.buffer);
+        return NULL;
+    }
+    state.indent_level++;
+    
+    for (int r = 0; r < result->row_count; r++) {
+        if (r > 0) {
+            if (!json_serialize_append(&state, ",", 1)) {
+                free(state.buffer);
+                return NULL;
+            }
+        }
+        if (state.pretty) {
+            if (!json_serialize_append(&state, "\n", 1) || !json_serialize_indent(&state)) {
+                free(state.buffer);
+                return NULL;
+            }
+        }
+        if (!json_serialize_append(&state, "[", 1)) {
+            free(state.buffer);
+            return NULL;
+        }
+        
+        for (int c = 0; c < result->column_count; c++) {
+            if (c > 0) {
+                if (!json_serialize_append(&state, ", ", 2)) {
+                    free(state.buffer);
+                    return NULL;
+                }
+            }
+            if (!json_serialize_field_value(&state, &result->rows[r][c])) {
+                free(state.buffer);
+                return NULL;
+            }
+        }
+        if (!json_serialize_append(&state, "]", 1)) {
+            free(state.buffer);
+            return NULL;
+        }
+    }
+    
+    state.indent_level--;
+    if (state.pretty) {
+        if (!json_serialize_append(&state, "\n", 1) || !json_serialize_indent(&state)) {
+            free(state.buffer);
+            return NULL;
+        }
+    }
+    if (!json_serialize_append(&state, "]", 1)) {
+        free(state.buffer);
+        return NULL;
+    }
+    
+    // End root object
+    state.indent_level--;
+    if (state.pretty) {
+        if (!json_serialize_append(&state, "\n", 1) || !json_serialize_indent(&state)) {
+            free(state.buffer);
+            return NULL;
+        }
+    }
+    if (!json_serialize_append(&state, "}", 1)) {
+        free(state.buffer);
+        return NULL;
+    }
+    
+    return state.buffer;
 }

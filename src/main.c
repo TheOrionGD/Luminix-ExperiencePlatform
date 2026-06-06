@@ -8,11 +8,16 @@
 #include <pthread.h>
 #include <sys/stat.h>
 #include <sys/time.h>
+#ifdef _WIN32
+#include <windows.h>
+#endif
 
 #include "database.h"
 #include "index.h"
 #include "json_io.h"
 #include "utils.h"
+void trim_string(char* str);
+
 #include "config.h"
 
 // ==================== MISSING TYPE DEFINITIONS ====================
@@ -35,62 +40,7 @@ typedef struct {
     int vacuum_threshold;
     int max_connections;
 } DatabaseConfig;
-typedef struct {
-    long long tables_created;
-    long long records_inserted;
-    long long records_updated;
-    long long records_deleted;
-    long long queries_executed;
-    long long cache_hits;
-    long long cache_misses;
-    long long transactions_started;
-    long long transactions_committed;
-    long long transactions_rolled_back;
-    long long indexes_created;
-    long long indexes_dropped;
-    long long vacuum_operations;
-    long long optimization_operations;
 
-    // New fields to match main.c usage
-    double total_query_time;        // total time spent executing queries
-    size_t memory_used;             // current memory used by database
-    size_t peak_memory_used;        // peak memory usage
-    size_t cache_memory_used;       // memory used by query cache
-    int deadlocks_detected;         // number of deadlocks detected
-    int backup_operations;          // number of backup operations performed
-} DatabaseStatistics;
-
-// Statistics structure
-typedef struct {
-    long long tables_created;
-    long long records_inserted;
-    long long records_updated;
-    long long records_deleted;
-    long long queries_executed;
-    long long cache_hits;
-    long long cache_misses;
-    double total_query_time;
-    size_t memory_used;
-    size_t peak_memory_used;
-    size_t cache_memory_used;
-    long long transactions_started;
-    long long transactions_committed;
-    long long transactions_rolled_back;
-    long long deadlocks_detected;
-    long long vacuum_operations;
-    long long backup_operations;
-    long long optimization_operations;
-} Statistics;
-
-// Table statistics structure
-typedef struct {
-    long long records_inserted;
-    long long records_updated;
-    long long records_deleted;
-    long long index_scans;
-    long long sequential_scans;
-    size_t total_size_bytes;
-} TableStatistics;
 
 // Forward declarations
 typedef struct QueryResult QueryResult;
@@ -100,7 +50,7 @@ typedef struct TableStatisticsInternal TableStatisticsInternal;
 
 // Helper function declarations (to be implemented in respective modules)
 int index_manager_get_count(IndexManager* manager);
-Index* index_manager_get_index(IndexManager* manager, int i);
+Index* get_index_by_id(IndexManager* manager, int i);
 const char* index_get_field_name(Index* index);
 const char* index_get_type_string(Index* index);
 size_t index_get_memory_usage(Index* index);
@@ -167,9 +117,11 @@ void rebuild_index_interactive();
 void optimize_index_interactive();
 
 void execute_query_interactive();
+
+
 void execute_script_interactive();
 void query_history();
-void save_query_result();
+void save_query_result(QueryResult* result);
 void explain_query_interactive();
 
 void vacuum_database_interactive();
@@ -196,13 +148,8 @@ void load_state();
 
 void print_prompt();
 char* read_input();
-char* read_multiline_input();
 void add_to_history(const char* query);
-void clear_screen();
-void print_error(ErrorCode code);
-void print_success(const char* message);
-void print_warning(const char* message);
-void print_info(const char* message);
+void print_error_code(ErrorCode code);
 
 void print_record_formatted(Record* record, Table* table, OutputFormat format);
 void print_table_formatted(Table* table, OutputFormat format);
@@ -322,31 +269,6 @@ char* read_input() {
     return buffer;
 }
 
-char* read_multiline_input() {
-    static char buffer[MAX_QUERY_LEN * 10];
-    buffer[0] = '\0';
-    
-    printf("Enter multi-line input (end with ';;' on its own line):\n");
-    
-    char line[MAX_QUERY_LEN];
-    while (fgets(line, sizeof(line), stdin)) {
-        // Check for termination
-        if (strcmp(line, ";;\n") == 0) {
-            break;
-        }
-        
-        // Append to buffer
-        strcat(buffer, line);
-        
-        // Check buffer overflow
-        if (strlen(buffer) >= sizeof(buffer) - MAX_QUERY_LEN) {
-            printf("Input too long. Truncating.\n");
-            break;
-        }
-    }
-    
-    return buffer;
-}
 
 void add_to_history(const char* query) {
     if (!query || strlen(query) == 0) return;
@@ -366,6 +288,34 @@ void add_to_history(const char* query) {
 }
 
 // ==================== OUTPUT FORMATTING ====================
+void print_record(Record* record, Table* table) {
+    if (!record || !table) return;
+    printf("ID: %d | ", record->id);
+    for (int i = 0; i < table->field_count; i++) {
+        printf("%s: ", table->field_names[i]);
+        switch (record->fields[i].type) {
+            case TYPE_INT: printf("%d", record->fields[i].value.int_value); break;
+            case TYPE_STRING: printf("%s", record->fields[i].value.string_value); break;
+            case TYPE_FLOAT: printf("%.2f", record->fields[i].value.float_value); break;
+            case TYPE_DOUBLE: printf("%.4f", record->fields[i].value.double_value); break;
+            case TYPE_BOOL: printf("%s", record->fields[i].value.bool_value ? "true" : "false"); break;
+            default: printf("NULL"); break;
+        }
+        if (i < table->field_count - 1) printf(", ");
+    }
+    printf("\n");
+}
+
+static void print_table(Table* table) {
+    if (!table) return;
+    printf("Table: %s (Records: %d)\n", table->name, table->record_count);
+    Record* current = table->records;
+    while (current) {
+        print_record(current, table);
+        current = current->next;
+    }
+}
+
 void print_record_formatted(Record* record, Table* table, OutputFormat format) {
     if (!record || !table) return;
     
@@ -643,7 +593,7 @@ void print_query_result_formatted(QueryResult* result, OutputFormat format) {
 }
 
 // ==================== ERROR HANDLING ====================
-void print_error(ErrorCode code) {
+void print_error_code(ErrorCode code) {
     const char* message = NULL;
     
     switch (code) {
@@ -670,17 +620,6 @@ void print_error(ErrorCode code) {
     printf("\033[1;31mError %d: %s\033[0m\n", code, message);
 }
 
-void print_success(const char* message) {
-    printf("\033[1;32m✓ %s\033[0m\n", message);
-}
-
-void print_warning(const char* message) {
-    printf("\033[1;33m⚠ %s\033[0m\n", message);
-}
-
-void print_info(const char* message) {
-    printf("\033[1;36mℹ %s\033[0m\n", message);
-}
 
 // ==================== DATABASE OPERATIONS ====================
 void create_database_interactive() {
@@ -708,11 +647,11 @@ void create_database_interactive() {
     config.vacuum_threshold = 1000;
     config.max_connections = 100;
     
-    g_database = db_create_ex(&config);
+    g_database = db_create();
     if (g_database) {
         print_success("Database created successfully");
     } else {
-        print_error(ERROR_GENERIC);
+        print_error_code(ERROR_GENERIC);
     }
 }
 
@@ -729,7 +668,7 @@ void open_database_interactive() {
         printf("Database: %s\n", get_database_name(g_database));
         printf("Tables: %d\n", db_get_table_count(g_database));
     } else {
-        print_error(ERROR_GENERIC);
+        print_error_code(ERROR_GENERIC);
     }
 }
 
@@ -754,7 +693,7 @@ void close_database_interactive() {
 
 void backup_database_interactive() {
     if (!g_database) {
-        print_error(ERROR_NOT_FOUND);
+        print_error_code(ERROR_NOT_FOUND);
         return;
     }
     
@@ -773,7 +712,7 @@ void backup_database_interactive() {
     if (result == SUCCESS) {
         print_success("Backup created successfully");
     } else {
-        print_error(result);
+        print_error_code(result);
     }
 }
 
@@ -789,7 +728,7 @@ void restore_database_interactive() {
     ErrorCode result = db_list_backups(backup_dir, &backups, &count);
     
     if (result != SUCCESS || count == 0) {
-        print_error(result);
+        print_error_code(result);
         return;
     }
     
@@ -804,7 +743,7 @@ void restore_database_interactive() {
     int choice = atoi(choice_str);
     
     if (choice < 1 || choice > count) {
-        print_error(ERROR_INVALID_INPUT);
+        print_error_code(ERROR_INVALID_INPUT);
         return;
     }
     
@@ -832,14 +771,14 @@ void restore_database_interactive() {
     if (result == SUCCESS) {
         print_success("Backup restored successfully");
     } else {
-        print_error(result);
+        print_error_code(result);
     }
 }
 
 // ==================== TABLE OPERATIONS ====================
 void create_table_interactive() {
     if (!g_database) {
-        print_error(ERROR_NOT_FOUND);
+        print_error_code(ERROR_NOT_FOUND);
         return;
     }
     
@@ -855,7 +794,7 @@ void create_table_interactive() {
     field_count = atoi(count_str);
     
     if (field_count <= 0 || field_count > MAX_FIELDS_PER_TABLE) {
-        print_error(ERROR_INVALID_INPUT);
+        print_error_code(ERROR_INVALID_INPUT);
         return;
     }
     
@@ -864,7 +803,7 @@ void create_table_interactive() {
     Constraint* constraints = calloc(field_count, sizeof(Constraint));
     
     if (!field_names || !field_types || !constraints) {
-        print_error(ERROR_MEMORY_ALLOCATION);
+        print_error_code(ERROR_MEMORY_ALLOCATION);
         free(field_names);
         free(field_types);
         free(constraints);
@@ -922,7 +861,7 @@ void create_table_interactive() {
         }
         print_success("Table created successfully");
     } else {
-        print_error(result);
+        print_error_code(result);
     }
     
     // Cleanup
@@ -936,7 +875,7 @@ void create_table_interactive() {
 
 void list_tables_interactive() {
     if (!g_database) {
-        print_error(ERROR_NOT_FOUND);
+        print_error_code(ERROR_NOT_FOUND);
         return;
     }
     
@@ -966,7 +905,7 @@ void list_tables_interactive() {
 
 void describe_table_interactive() {
     if (!g_database) {
-        print_error(ERROR_NOT_FOUND);
+        print_error_code(ERROR_NOT_FOUND);
         return;
     }
     
@@ -977,7 +916,7 @@ void describe_table_interactive() {
     
     Table* table = db_get_table(g_database, table_name);
     if (!table) {
-        print_error(ERROR_NOT_FOUND);
+        print_error_code(ERROR_NOT_FOUND);
         return;
     }
     
@@ -1009,7 +948,7 @@ void describe_table_interactive() {
     if (table->index_manager && index_manager_get_count(table->index_manager) > 0) {
         printf("\nIndexes (%d):\n", index_manager_get_count(table->index_manager));
         for (int i = 0; i < index_manager_get_count(table->index_manager); i++) {
-            Index* index = index_manager_get_index(table->index_manager, i);
+            Index* index = get_index_by_id(table->index_manager, i);
             if (index) {
                 printf("  • %s (%s)\n", 
                        index_get_field_name(index), 
@@ -1021,7 +960,7 @@ void describe_table_interactive() {
 
 void alter_table_interactive() {
     if (!g_database) {
-        print_error(ERROR_NOT_FOUND);
+        print_error_code(ERROR_NOT_FOUND);
         return;
     }
     
@@ -1048,7 +987,7 @@ void alter_table_interactive() {
     
     Table* table = db_get_table(g_database, table_name);
     if (!table) {
-        print_error(ERROR_NOT_FOUND);
+        print_error_code(ERROR_NOT_FOUND);
         return;
     }
     
@@ -1081,7 +1020,7 @@ void alter_table_interactive() {
             if (result == SUCCESS) {
                 print_success("Column added successfully");
             } else {
-                print_error(result);
+                print_error_code(result);
             }
             break;
         }
@@ -1102,7 +1041,7 @@ void alter_table_interactive() {
                 if (result == SUCCESS) {
                     print_success("Column dropped successfully");
                 } else {
-                    print_error(result);
+                    print_error_code(result);
                 }
             }
             break;
@@ -1125,7 +1064,7 @@ void alter_table_interactive() {
             if (result == SUCCESS) {
                 print_success("Column renamed successfully");
             } else {
-                print_error(result);
+                print_error_code(result);
             }
             break;
         }
@@ -1138,7 +1077,7 @@ void alter_table_interactive() {
 
 void truncate_table_interactive() {
     if (!g_database) {
-        print_error(ERROR_NOT_FOUND);
+        print_error_code(ERROR_NOT_FOUND);
         return;
     }
     
@@ -1157,14 +1096,14 @@ void truncate_table_interactive() {
         if (result == SUCCESS) {
             print_success("Table truncated successfully");
         } else {
-            print_error(result);
+            print_error_code(result);
         }
     }
 }
 
 void drop_table_interactive() {
     if (!g_database) {
-        print_error(ERROR_NOT_FOUND);
+        print_error_code(ERROR_NOT_FOUND);
         return;
     }
     
@@ -1183,14 +1122,14 @@ void drop_table_interactive() {
         if (result == SUCCESS) {
             print_success("Table dropped successfully");
         } else {
-            print_error(result);
+            print_error_code(result);
         }
     }
 }
 
 void import_table_interactive() {
     if (!g_database) {
-        print_error(ERROR_NOT_FOUND);
+        print_error_code(ERROR_NOT_FOUND);
         return;
     }
     
@@ -1237,13 +1176,13 @@ void import_table_interactive() {
     if (result == SUCCESS) {
         print_success("Table imported successfully");
     } else {
-        print_error(result);
+        print_error_code(result);
     }
 }
 
 void export_table_interactive() {
     if (!g_database) {
-        print_error(ERROR_NOT_FOUND);
+        print_error_code(ERROR_NOT_FOUND);
         return;
     }
     
@@ -1254,7 +1193,7 @@ void export_table_interactive() {
     
     Table* table = db_get_table(g_database, table_name);
     if (!table) {
-        print_error(ERROR_NOT_FOUND);
+        print_error_code(ERROR_NOT_FOUND);
         return;
     }
     
@@ -1280,14 +1219,14 @@ void export_table_interactive() {
     if (result == SUCCESS) {
         print_success("Table exported successfully");
     } else {
-        print_error(result);
+        print_error_code(result);
     }
 }
 
 // ==================== INDEX OPERATIONS ====================
 void create_index_interactive() {
     if (!g_database) {
-        print_error(ERROR_NOT_FOUND);
+        print_error_code(ERROR_NOT_FOUND);
         return;
     }
     
@@ -1298,7 +1237,7 @@ void create_index_interactive() {
     
     Table* table = db_get_table(g_database, table_name);
     if (!table) {
-        print_error(ERROR_NOT_FOUND);
+        print_error_code(ERROR_NOT_FOUND);
         return;
     }
     
@@ -1315,7 +1254,7 @@ void create_index_interactive() {
     int field_choice = atoi(field_choice_str) - 1;
     
     if (field_choice < 0 || field_choice >= table->field_count) {
-        print_error(ERROR_INVALID_INPUT);
+        print_error_code(ERROR_INVALID_INPUT);
         return;
     }
     
@@ -1347,13 +1286,13 @@ void create_index_interactive() {
     if (result == SUCCESS) {
         print_success("Index created successfully");
     } else {
-        print_error(result);
+        print_error_code(result);
     }
 }
 
 void list_indexes_interactive() {
     if (!g_database) {
-        print_error(ERROR_NOT_FOUND);
+        print_error_code(ERROR_NOT_FOUND);
         return;
     }
     
@@ -1365,7 +1304,7 @@ void list_indexes_interactive() {
     if (strlen(table_name) > 0) {
         Table* table = db_get_table(g_database, table_name);
         if (!table) {
-            print_error(ERROR_NOT_FOUND);
+            print_error_code(ERROR_NOT_FOUND);
             return;
         }
         
@@ -1381,7 +1320,7 @@ void list_indexes_interactive() {
         printf("├─────┼──────────────────────────────┼────────────────┼──────────────┤\n");
         
         for (int i = 0; i < index_count; i++) {
-            Index* index = index_manager_get_index(table->index_manager, i);
+            Index* index = get_index_by_id(table->index_manager, i);
             if (index) {
                 printf("│ %3d │ %-28s │ %-14s │ %-12zu │\n",
                        i + 1,
@@ -1404,7 +1343,7 @@ void list_indexes_interactive() {
             if (index_count > 0) {
                 printf("\nTable: %s\n", table->name);
                 for (int i = 0; i < index_count; i++) {
-                    Index* index = index_manager_get_index(table->index_manager, i);
+                    Index* index = get_index_by_id(table->index_manager, i);
                     if (index) {
                         printf("  • %s (%s)\n", 
                                index_get_field_name(index), 
@@ -1425,7 +1364,7 @@ void list_indexes_interactive() {
 
 void drop_index_interactive() {
     if (!g_database) {
-        print_error(ERROR_NOT_FOUND);
+        print_error_code(ERROR_NOT_FOUND);
         return;
     }
     
@@ -1436,19 +1375,19 @@ void drop_index_interactive() {
     
     Table* table = db_get_table(g_database, table_name);
     if (!table) {
-        print_error(ERROR_NOT_FOUND);
+        print_error_code(ERROR_NOT_FOUND);
         return;
     }
     
     int index_count = index_manager_get_count(table->index_manager);
     if (index_count == 0) {
-        print_error(ERROR_NOT_FOUND);
+        print_error_code(ERROR_NOT_FOUND);
         return;
     }
     
     printf("\nIndexes in table '%s':\n", table_name);
     for (int i = 0; i < index_count; i++) {
-        Index* index = index_manager_get_index(table->index_manager, i);
+        Index* index = get_index_by_id(table->index_manager, i);
         if (index) {
             printf("%d. %s (%s)\n", 
                    i + 1, 
@@ -1463,13 +1402,13 @@ void drop_index_interactive() {
     int choice = atoi(choice_str) - 1;
     
     if (choice < 0 || choice >= index_count) {
-        print_error(ERROR_INVALID_INPUT);
+        print_error_code(ERROR_INVALID_INPUT);
         return;
     }
     
-    Index* selected_index = index_manager_get_index(table->index_manager, choice);
+    Index* selected_index = get_index_by_id(table->index_manager, choice);
     if (!selected_index) {
-        print_error(ERROR_NOT_FOUND);
+        print_error_code(ERROR_NOT_FOUND);
         return;
     }
     
@@ -1485,14 +1424,14 @@ void drop_index_interactive() {
         if (result == SUCCESS) {
             print_success("Index dropped successfully");
         } else {
-            print_error(result);
+            print_error_code(result);
         }
     }
 }
 
 void rebuild_index_interactive() {
     if (!g_database) {
-        print_error(ERROR_NOT_FOUND);
+        print_error_code(ERROR_NOT_FOUND);
         return;
     }
     
@@ -1505,14 +1444,14 @@ void rebuild_index_interactive() {
         if (result == SUCCESS) {
             print_success("Indexes rebuilt successfully");
         } else {
-            print_error(result);
+            print_error_code(result);
         }
     }
 }
 
 void optimize_index_interactive() {
     if (!g_database) {
-        print_error(ERROR_NOT_FOUND);
+        print_error_code(ERROR_NOT_FOUND);
         return;
     }
     
@@ -1524,7 +1463,7 @@ void optimize_index_interactive() {
     if (strlen(table_name) > 0) {
         Table* table = db_get_table(g_database, table_name);
         if (!table) {
-            print_error(ERROR_NOT_FOUND);
+            print_error_code(ERROR_NOT_FOUND);
             return;
         }
         
@@ -1532,7 +1471,7 @@ void optimize_index_interactive() {
         if (index_count > 0) {
             printf("Optimizing indexes for table '%s':\n", table_name);
             for (int i = 0; i < index_count; i++) {
-                Index* index = index_manager_get_index(table->index_manager, i);
+                Index* index = get_index_by_id(table->index_manager, i);
                 if (index) {
                     printf("  Optimizing index on %s... ", index_get_field_name(index));
                     ErrorCode result = index_optimize(index);
@@ -1556,7 +1495,7 @@ void optimize_index_interactive() {
             int index_count = index_manager_get_count(table->index_manager);
             if (index_count > 0) {
                 for (int i = 0; i < index_count; i++) {
-                    Index* index = index_manager_get_index(table->index_manager, i);
+                    Index* index = get_index_by_id(table->index_manager, i);
                     if (index) {
                         index_optimize(index);
                         optimized++;
@@ -1572,7 +1511,7 @@ void optimize_index_interactive() {
 // ==================== QUERY OPERATIONS ====================
 void execute_query_interactive() {
     if (!g_database) {
-        print_error(ERROR_NOT_FOUND);
+        print_error_code(ERROR_NOT_FOUND);
         return;
     }
     
@@ -1633,13 +1572,15 @@ void execute_query_interactive() {
         // free_query_result(result);
     } else {
         printf("\nQuery failed (%.3f seconds)\n", elapsed);
-        print_error(ERROR_GENERIC);
+        print_error_code(ERROR_GENERIC);
     }
 }
 
+
+
 void execute_script_interactive() {
     if (!g_database) {
-        print_error(ERROR_NOT_FOUND);
+        print_error_code(ERROR_NOT_FOUND);
         return;
     }
     
@@ -1650,7 +1591,7 @@ void execute_script_interactive() {
     
     FILE* file = fopen(script_path, "r");
     if (!file) {
-        print_error(ERROR_IO_OPERATION);
+        print_error_code(ERROR_IO_OPERATION);
         return;
     }
     
@@ -1666,7 +1607,8 @@ void execute_script_interactive() {
         line_num++;
         
         // Skip comments and empty lines
-        if (line[0] == '#' || line[0] == '-' || strlen(trim_string(line)) == 0) {
+        trim_string(line);
+        if (line[0] == '#' || line[0] == '-' || strlen(line) == 0) {
             continue;
         }
         
@@ -1845,7 +1787,7 @@ void save_query_result(QueryResult* result) {
 
 void explain_query_interactive() {
     if (!g_database) {
-        print_error(ERROR_NOT_FOUND);
+        print_error_code(ERROR_NOT_FOUND);
         return;
     }
     
@@ -1864,14 +1806,14 @@ void explain_query_interactive() {
         printf("%s\n", explanation);
         free(explanation);
     } else {
-        print_error(result);
+        print_error_code(result);
     }
 }
 
 // ==================== MAINTENANCE OPERATIONS ====================
 void vacuum_database_interactive() {
     if (!g_database) {
-        print_error(ERROR_NOT_FOUND);
+        print_error_code(ERROR_NOT_FOUND);
         return;
     }
     
@@ -1931,7 +1873,7 @@ void vacuum_database_interactive() {
 
 void analyze_database_interactive() {
     if (!g_database) {
-        print_error(ERROR_NOT_FOUND);
+        print_error_code(ERROR_NOT_FOUND);
         return;
     }
     
@@ -1942,7 +1884,7 @@ void analyze_database_interactive() {
 
 void check_integrity_interactive() {
     if (!g_database) {
-        print_error(ERROR_NOT_FOUND);
+        print_error_code(ERROR_NOT_FOUND);
         return;
     }
     
@@ -1964,13 +1906,13 @@ void check_integrity_interactive() {
             // Additional repair logic would go here
         }
     } else {
-        print_error(result);
+        print_error_code(result);
     }
 }
 
 void repair_database_interactive() {
     if (!g_database) {
-        print_error(ERROR_NOT_FOUND);
+        print_error_code(ERROR_NOT_FOUND);
         return;
     }
     
@@ -1997,7 +1939,7 @@ void repair_database_interactive() {
             if (result == SUCCESS) {
                 print_success("Table repaired successfully");
             } else {
-                print_error(result);
+                print_error_code(result);
             }
             break;
         }
@@ -2026,7 +1968,7 @@ void repair_database_interactive() {
 
 void statistics_interactive() {
     if (!g_database) {
-        print_error(ERROR_NOT_FOUND);
+        print_error_code(ERROR_NOT_FOUND);
         return;
     }
     
@@ -2081,7 +2023,7 @@ void statistics_interactive() {
     int table_count = db_get_table_count(g_database);
     for (int i = 0; i < table_count; i++) {
         Table* table = &g_database->tables[i];
-        TableStatisticsInternal* table_stats = db_get_table_statistics(g_database, table->name);
+        TableStatistics* table_stats = db_get_table_statistics(g_database, table->name);
         
         if (table_stats) {
             printf("\nTable: %s\n", table->name);
@@ -2095,7 +2037,7 @@ void statistics_interactive() {
 // ==================== CONFIGURATION OPERATIONS ====================
 void show_config_interactive() {
     if (!g_database) {
-        print_error(ERROR_NOT_FOUND);
+        print_error_code(ERROR_NOT_FOUND);
         return;
     }
     
@@ -2130,13 +2072,13 @@ void show_config_interactive() {
         
         printf("└──────────────────────────────┴──────────────────────────────────────┘\n");
     } else {
-        print_error(result);
+        print_error_code(result);
     }
 }
 
 void set_config_interactive() {
     if (!g_database) {
-        print_error(ERROR_NOT_FOUND);
+        print_error_code(ERROR_NOT_FOUND);
         return;
     }
     
@@ -2155,13 +2097,13 @@ void set_config_interactive() {
     if (result == SUCCESS) {
         print_success("Configuration updated");
     } else {
-        print_error(result);
+        print_error_code(result);
     }
 }
 
 void reset_config_interactive() {
     if (!g_database) {
-        print_error(ERROR_NOT_FOUND);
+        print_error_code(ERROR_NOT_FOUND);
         return;
     }
     
@@ -2177,7 +2119,7 @@ void reset_config_interactive() {
 
 void export_config_interactive() {
     if (!g_database) {
-        print_error(ERROR_NOT_FOUND);
+        print_error_code(ERROR_NOT_FOUND);
         return;
     }
     
@@ -2190,13 +2132,13 @@ void export_config_interactive() {
     if (result == SUCCESS) {
         print_success("Configuration exported");
     } else {
-        print_error(result);
+        print_error_code(result);
     }
 }
 
 void import_config_interactive() {
     if (!g_database) {
-        print_error(ERROR_NOT_FOUND);
+        print_error_code(ERROR_NOT_FOUND);
         return;
     }
     
@@ -2209,7 +2151,7 @@ void import_config_interactive() {
     if (result == SUCCESS) {
         print_success("Configuration imported");
     } else {
-        print_error(result);
+        print_error_code(result);
     }
 }
 
@@ -2376,7 +2318,7 @@ void show_cheat_sheet() {
 // ==================== BENCHMARKING ====================
 void benchmark_database() {
     if (!g_database) {
-        print_error(ERROR_NOT_FOUND);
+        print_error_code(ERROR_NOT_FOUND);
         return;
     }
     
@@ -2425,7 +2367,7 @@ void benchmark_database() {
 
 void stress_test_database() {
     if (!g_database) {
-        print_error(ERROR_NOT_FOUND);
+        print_error_code(ERROR_NOT_FOUND);
         return;
     }
     
@@ -2463,7 +2405,7 @@ void stress_test_database() {
 
 void performance_monitor() {
     if (!g_database) {
-        print_error(ERROR_NOT_FOUND);
+        print_error_code(ERROR_NOT_FOUND);
         return;
     }
     
@@ -2488,7 +2430,7 @@ void print_banner() {
     printf(" |_|\\__,_|_| |_| |_|_|_| |_|_/_/\\_\\\n");
     printf("\033[0m");  // Reset color
     printf("\n");
-    printf("         Enterprise-Grade In-Memory JSON Database\n");
+    printf("          In-Memory JSON Database\n");
     printf("                  Version: %s\n", LUMINIX_VERSION_STRING);
     printf("========================================================\n\n");
 }
@@ -2632,7 +2574,7 @@ void handle_database_operations() {
                     printf("Path: %s\n", get_database_path(g_database));
                     statistics_interactive();
                 } else {
-                    print_error(ERROR_NOT_FOUND);
+                    print_error_code(ERROR_NOT_FOUND);
                 }
                 break;
             case 7:
@@ -2660,7 +2602,7 @@ void handle_database_operations() {
 
 void handle_table_operations() {
     if (!g_database) {
-        print_error(ERROR_NOT_FOUND);
+        print_error_code(ERROR_NOT_FOUND);
         printf("Please open or create a database first.\n");
         return;
     }
@@ -2715,7 +2657,7 @@ void handle_table_operations() {
 
 void handle_index_operations() {
     if (!g_database) {
-        print_error(ERROR_NOT_FOUND);
+        print_error_code(ERROR_NOT_FOUND);
         printf("Please open or create a database first.\n");
         return;
     }
@@ -2770,7 +2712,7 @@ void handle_index_operations() {
 
 void handle_query_operations() {
     if (!g_database) {
-        print_error(ERROR_NOT_FOUND);
+        print_error_code(ERROR_NOT_FOUND);
         printf("Please open or create a database first.\n");
         return;
     }
@@ -2825,7 +2767,7 @@ void handle_query_operations() {
 
 void handle_maintenance_operations() {
     if (!g_database) {
-        print_error(ERROR_NOT_FOUND);
+        print_error_code(ERROR_NOT_FOUND);
         printf("Please open or create a database first.\n");
         return;
     }
@@ -2880,7 +2822,7 @@ void handle_maintenance_operations() {
 
 void handle_config_operations() {
     if (!g_database) {
-        print_error(ERROR_NOT_FOUND);
+        print_error_code(ERROR_NOT_FOUND);
         printf("Please open or create a database first.\n");
         return;
     }
@@ -2992,7 +2934,7 @@ void handle_help() {
                 printf("Author: Luminix Development Team\n");
                 printf("License: MIT\n");
                 printf("Website: https://github.com/luminix/db\n");
-                printf("\nAn enterprise-grade in-memory JSON database\n");
+                printf("\nAn in-memory JSON database\n");
                 printf("built in C for high performance applications.\n");
                 break;
             case 0:
@@ -3068,109 +3010,86 @@ void handle_tools() {
     } while (choice != 0);
 }
 
-// ==================== UTILITY FUNCTIONS ====================
-void clear_screen() {
-    #ifdef _WIN32
-        system("cls");
-    #else
-        system("clear");
-    #endif
-}
 
 // ==================== STUB IMPLEMENTATIONS ====================
 // These are stub implementations for the helper functions.
 // You should implement these properly in your respective modules.
 
-int index_manager_get_count(IndexManager* manager) {
-    // TODO: Implement properly
-    if (!manager) return 0;
-    return 0;
-}
-
-Index* index_manager_get_index(IndexManager* manager, int i) {
-    // TODO: Implement properly
-    if (!manager) return NULL;
-    return NULL;
+Index* get_index_by_id(IndexManager* manager, int i) {
+    if (!manager || i < 0 || i >= manager->index_count) return NULL;
+    return manager->indexes[i];
 }
 
 const char* index_get_field_name(Index* index) {
-    // TODO: Implement properly
     if (!index) return "unknown";
-    return "field";
+    return index->field_name;
 }
 
 const char* index_get_type_string(Index* index) {
-    // TODO: Implement properly
     if (!index) return "UNKNOWN";
-    return "HASH";
+    switch (index->type) {
+        case INDEX_HASH: return "HASH";
+        case INDEX_BTREE: return "B-TREE";
+        case INDEX_SKIPLIST: return "SKIPLIST";
+        case INDEX_BITMAP: return "BITMAP";
+        case INDEX_FULLTEXT: return "FULLTEXT";
+        default: return "UNKNOWN";
+    }
 }
 
 size_t index_get_memory_usage(Index* index) {
-    // TODO: Implement properly
     if (!index) return 0;
-    return 0;
+    return sizeof(Index);
 }
 
 ErrorCode index_optimize(Index* index) {
-    // TODO: Implement properly
     if (!index) return ERROR_NOT_FOUND;
     return SUCCESS;
 }
 
 int query_result_get_row_count(QueryResult* result) {
-    // TODO: Implement properly
     if (!result) return 0;
-    return 0;
+    return result->row_count;
 }
 
 int query_result_get_column_count(QueryResult* result) {
-    // TODO: Implement properly
     if (!result) return 0;
-    return 0;
+    return result->column_count;
 }
 
 char* query_result_get_column_name(QueryResult* result, int col) {
-    // TODO: Implement properly
-    static char name[32] = "column";
-    return name;
+    if (!result || col < 0 || col >= result->column_count) return NULL;
+    return result->column_names[col];
 }
 
 FieldType query_result_get_column_type(QueryResult* result, int col) {
-    // TODO: Implement properly
-    return TYPE_STRING;
+    if (!result || col < 0 || col >= result->column_count) return TYPE_UNKNOWN;
+    return result->column_types[col];
 }
 
 Field* query_result_get_field(QueryResult* result, int row, int col) {
-    // TODO: Implement properly
-    static Field dummy_field = {0};
-    return &dummy_field;
-}
-
-DatabaseStatistics* db_get_statistics(Database* db){
-    // TODO: Implement properly
-    static DatabaseStatistics dummy_stats = {0};
-    return &dummy_stats;
-}
-
-TableStatistics* db_get_table_statistics(Database* db, const char* table_name) {
-    // TODO: Implement properly
-    return NULL;
+    if (!result || row < 0 || row >= result->row_count || col < 0 || col >= result->column_count) {
+        return NULL;
+    }
+    return &result->rows[row][col];
 }
 
 char* get_database_name(Database* db) {
-    // TODO: Implement properly - get actual database name
     static char name[32] = "Database";
     return name;
 }
 
 char* get_database_path(Database* db) {
-    // TODO: Implement properly - get actual database path
     static char path[32] = ".";
     return path;
 }
 
 // ==================== MAIN FUNCTION ====================
 int main(int argc, char* argv[]) {
+#ifdef _WIN32
+    SetConsoleOutputCP(CP_UTF8);
+    SetConsoleCP(CP_UTF8);
+#endif
     // Set up signal handlers
     signal(SIGINT, signal_handler);
     signal(SIGTERM, signal_handler);
@@ -3294,7 +3213,7 @@ int main(int argc, char* argv[]) {
                         if (table) {
                             print_table_formatted(table, FORMAT_TABLE);
                         } else {
-                            print_error(ERROR_NOT_FOUND);
+                            print_error_code(ERROR_NOT_FOUND);
                         }
                     } else if (strcmp(cmd, "i") == 0) {
                         import_table_interactive();

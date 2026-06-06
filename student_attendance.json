@@ -1,0 +1,183 @@
+{
+  "metadata": {
+    "name": "student_attendance_db",
+    "version": "1.0.0",
+    "created_at": "2026-06-06 18:41:00",
+    "table_count": 3
+  },
+  "tables": [
+    {
+      "schema": {
+        "name": "students",
+        "fields": [
+          {
+            "name": "id",
+            "type": "INT",
+            "constraints": ["PRIMARY KEY"]
+          },
+          {
+            "name": "student_number",
+            "type": "STRING"
+          },
+          {
+            "name": "first_name",
+            "type": "STRING"
+          },
+          {
+            "name": "last_name",
+            "type": "STRING"
+          },
+          {
+            "name": "class_section",
+            "type": "STRING"
+          },
+          {
+            "name": "email",
+            "type": "STRING"
+          }
+        ],
+        "record_count": 3
+      },
+      "records": [
+        {
+          "id": 1,
+          "fields": {
+            "student_number": "STU-1001",
+            "first_name": "Alice",
+            "last_name": "Smith",
+            "class_section": "Grade 11-A",
+            "email": "alice.smith@school.edu"
+          }
+        },
+        {
+          "id": 2,
+          "fields": {
+            "student_number": "STU-1002",
+            "first_name": "Bob",
+            "last_name": "Johnson",
+            "class_section": "Grade 11-B",
+            "email": "bob.johnson@school.edu"
+          }
+        },
+        {
+          "id": 3,
+          "fields": {
+            "student_number": "STU-1003",
+            "first_name": "Charlie",
+            "last_name": "Brown",
+            "class_section": "Grade 11-A",
+            "email": "charlie.brown@school.edu"
+          }
+        }
+      ]
+    },
+    {
+      "schema": {
+        "name": "courses",
+        "fields": [
+          {
+            "name": "id",
+            "type": "INT",
+            "constraints": ["PRIMARY KEY"]
+          },
+          {
+            "name": "course_code",
+            "type": "STRING"
+          },
+          {
+            "name": "course_name",
+            "type": "STRING"
+          },
+          {
+            "name": "instructor",
+            "type": "STRING"
+          }
+        ],
+        "record_count": 2
+      },
+      "records": [
+        {
+          "id": 1,
+          "fields": {
+            "course_code": "BIO-101",
+            "course_name": "Introduction to Biology",
+            "instructor": "Dr. Sarah Miller"
+          }
+        },
+        {
+          "id": 2,
+          "fields": {
+            "course_code": "MTH-201",
+            "course_name": "Advanced Algebra",
+            "instructor": "Prof. David Clark"
+          }
+        }
+      ]
+    },
+    {
+      "schema": {
+        "name": "attendance",
+        "fields": [
+          {
+            "name": "id",
+            "type": "INT",
+            "constraints": ["PRIMARY KEY"]
+          },
+          {
+            "name": "student_id",
+            "type": "INT"
+          },
+          {
+            "name": "course_id",
+            "type": "INT"
+          },
+          {
+            "name": "attendance_date",
+            "type": "DATETIME"
+          },
+          {
+            "name": "status",
+            "type": "STRING"
+          },
+          {
+            "name": "notes",
+            "type": "STRING"
+          }
+        ],
+        "record_count": 3
+      },
+      "records": [
+        {
+          "id": 1,
+          "fields": {
+            "student_id": 1,
+            "course_id": 1,
+            "attendance_date": "2026-06-06 09:00:00",
+            "status": "PRESENT",
+            "notes": "Arrived on time"
+          }
+        },
+        {
+          "id": 2,
+          "fields": {
+            "student_id": 2,
+            "course_id": 1,
+            "attendance_date": "2026-06-06 09:00:00",
+            "status": "LATE",
+            "notes": "Late by 10 minutes due to bus delay"
+          }
+        },
+        {
+          "id": 3,
+          "fields": {
+            "student_id": 3,
+            "course_id": 2,
+            "attendance_date": "2026-06-06 10:30:00",
+            "status": "ABSENT",
+            "notes": "Excused sick leave"
+          }
+        }
+      ]
+    }
+  ]
+}

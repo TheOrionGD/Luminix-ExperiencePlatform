@@ -25,10 +25,10 @@ char* str_to_lower(char* str);
 char* str_to_upper(char* str);
 
 // Type conversion
-bool string_to_bool(const char* str);
-int string_to_int(const char* str);
+int string_to_int(const char* str, int* result);
+int string_to_double(const char* str, double* result);
+int string_to_bool(const char* str);
 float string_to_float(const char* str);
-double string_to_double(const char* str);
 
 // Validation
 bool is_valid_identifier(const char* str);
@@ -40,7 +40,7 @@ bool is_valid_index_name(const char* name);
 const char* error_code_to_string(ErrorCode code);
 
 // Debugging
-void print_record(Record* record);
+void print_record(Record* record, Table* table);
 void print_field(Field* field);
 void print_query_result(QueryResult* result);
 
@@ -159,9 +159,7 @@ int is_integer(const char* str);
 int is_float(const char* str);
 int is_boolean(const char* str);
 int is_date(const char* str);
-int string_to_int(const char* str, int* result);
-int string_to_double(const char* str, double* result);
-int string_to_bool(const char* str);
+
 
 // ==================== Validation Utilities ====================
 int validate_table_name(const char* name);
@@ -215,4 +213,6 @@ PerformanceTimer* start_timer();
 double stop_timer(PerformanceTimer* timer);
 void print_performance_stats(const char* operation, double time_seconds, long bytes_processed);
 
+void trim_string(char* str);
 #endif // UTILS_H
+

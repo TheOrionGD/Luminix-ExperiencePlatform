@@ -8,7 +8,19 @@
 #define MAX_FIELD_NAME 64
 #define MAX_INDEX_NAME 64
 
-// Error codes (re-exported for convenience)
+#ifdef ERROR_NOT_FOUND
+#undef ERROR_NOT_FOUND
+#endif
+
+#ifdef ERROR_INVALID_PARAMETER
+#undef ERROR_INVALID_PARAMETER
+#endif
+
+#ifdef ERROR_TIMEOUT
+#undef ERROR_TIMEOUT
+#endif
+
+// Error codes (centralized)
 typedef enum {
     SUCCESS = 0,
     ERROR_NOT_FOUND = -1,
@@ -20,10 +32,18 @@ typedef enum {
     ERROR_TYPE_MISMATCH = -7,
     ERROR_CONSTRAINT_VIOLATION = -8,
     ERROR_INDEX_EXISTS = -9,
-    ERROR_NOT_IMPLEMENTED = -10
+    ERROR_NOT_IMPLEMENTED = -10,
+    ERROR_GENERIC = -11,
+    ERROR_INVALID_INPUT = -12,
+    ERROR_IO_OPERATION = -13,
+    ERROR_PERMISSION_DENIED = -14,
+    ERROR_CORRUPT_DATA = -15,
+    ERROR_INDEX_NOT_FOUND = -16,
+    ERROR_DEADLOCK_DETECTED = -17,
+    ERROR_TIMEOUT = -18
 } ErrorCode;
 
-// Field types (re-exported for convenience)
+// Field types (centralized)
 typedef enum {
     TYPE_UNKNOWN = 0,
     TYPE_INT,
@@ -36,8 +56,9 @@ typedef enum {
     TYPE_NULL
 } FieldType;
 
-// Index types (re-exported for convenience)
+// Index types (centralized)
 typedef enum {
+    INDEX_NONE = 0,
     INDEX_HASH,
     INDEX_BTREE,
     INDEX_SKIPLIST,

@@ -1282,3 +1282,17 @@ void print_performance_stats(const char* operation, double time_seconds, long by
     
     printf("\n");
 }
+void trim_string(char* str) {
+    if (!str) return;
+    int len = strlen(str);
+    while(len > 0 && isspace((unsigned char)str[len - 1])) {
+        str[--len] = '\0';
+    }
+    char* start = str;
+    while(*start && isspace((unsigned char)*start)) {
+        start++;
+    }
+    if (start != str) {
+        memmove(str, start, len - (start - str) + 1);
+    }
+}

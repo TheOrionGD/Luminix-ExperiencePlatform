@@ -1,0 +1,32 @@
+# Compilations and Binaries
+*.exe
+*.out
+*.app
+*.o
+*.obj
+src/*.o
+tests/*.o
+
+# Database States & Runtime Data
+*.state.json
+*.db
+*.idx
+default.state.json
+Database.state.json
+
+# Logs
+*.log
+audit.log
+luminix.log
+
+# IDEs & Editor Files
+.vscode/
+.idea/
+*.suo
+*.user
+*.pdb
+
+# Local / Temp Files
+output.txt
+test_quick.exe
+/scratch/

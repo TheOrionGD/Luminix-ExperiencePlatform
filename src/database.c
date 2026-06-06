@@ -1,79 +1,12 @@
 #include "database.h"
+#include "index.h"
+#include "json_io.h"
 #include "utils.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
 #include <time.h>
 #include <ctype.h>
-
-// ==================== COMPLETE TYPE DEFINITIONS ====================
-
-// Complete Index structure definition
-struct Index {
-    char table_name[MAX_TABLE_NAME];
-    char field_name[MAX_FIELD_LEN];
-    IndexType type;
-    void* data;  // Implementation-specific data
-};
-
-// Complete TableStatistics structure
-struct TableStatistics {
-    long long records_inserted;
-    long long records_updated;
-    long long records_deleted;
-    long long index_scans;
-    long long sequential_scans;
-};
-// Add QueryType enum definition
-typedef enum {
-    QUERY_SELECT,
-    QUERY_INSERT,
-    QUERY_UPDATE,
-    QUERY_DELETE,
-    QUERY_CREATE_TABLE,
-    QUERY_DROP_TABLE,
-    QUERY_CREATE_INDEX,
-    QUERY_DROP_INDEX
-} QueryType;
-
-typedef enum {
-    TYPE_UNKNOWN = 0,   // <-- ADD THIS
-    TYPE_INT,
-    TYPE_STRING,
-    TYPE_FLOAT,
-    TYPE_DOUBLE,
-    TYPE_BOOL,
-    TYPE_DATETIME,
-    TYPE_BLOB,
-    TYPE_NULL
-} FieldType;
-
-
-// Complete Cache structure (simple stub)
-struct Cache {
-    int policy;
-    int size;
-    void* data;
-};
-
-// Complete ParsedQuery structure
-struct ParsedQuery {
-    QueryType type;
-    char* table_name;
-    char* field_name;
-    char* condition;
-    int int_value;
-    char* string_value;
-};
-
-// Complete QueryResult structure
-struct QueryResult {
-    int row_count;
-    int column_count;
-    char** column_names;
-    FieldType* column_types;
-    Field** rows;
-};
 
 // ==================== INTERNAL HELPER FUNCTIONS ====================
 
@@ -95,7 +28,7 @@ static int generate_record_id(Table* table) {
 
 // Validate field value against type
 static ErrorCode validate_field_value(FieldType type, const char* value_str) {
-    if (!value_str) return NULL;
+    if (!value_str) return ERROR_INVALID_INPUT;
     
     switch (type) {
         case TYPE_INT: {
@@ -163,7 +96,7 @@ static ErrorCode validate_field_value(FieldType type, const char* value_str) {
 
 // Convert string to field value
 static ErrorCode string_to_field_value(Field* field, const char* value_str) {
-    if (!field || !value_str) return NULL;
+    if (!field || !value_str) return ERROR_INVALID_INPUT;
     
     ErrorCode validation = validate_field_value(field->type, value_str);
     if (validation != SUCCESS) return validation;
@@ -210,7 +143,7 @@ static IndexManager* create_simple_index_manager() {
     IndexManager* manager = (IndexManager*)malloc(sizeof(IndexManager));
     if (!manager) return NULL;
     
-    manager->indices = NULL;
+    manager->indexes = NULL;
     manager->index_count = 0;
     manager->capacity = 0;
     
@@ -219,10 +152,10 @@ static IndexManager* create_simple_index_manager() {
 
 // Find index by table and field name
 static Index* find_index_in_manager(IndexManager* manager, const char* table_name, const char* field_name) {
-    if (!manager || !manager->indices) return NULL;
+    if (!manager || !manager->indexes) return NULL;
     
     for (int i = 0; i < manager->index_count; i++) {
-        Index* idx = manager->indices[i];
+        Index* idx = manager->indexes[i];
         if (idx && strcmp(idx->table_name, table_name) == 0 && 
             strcmp(idx->field_name, field_name) == 0) {
             return idx;
@@ -234,33 +167,33 @@ static Index* find_index_in_manager(IndexManager* manager, const char* table_nam
 
 // Add index to manager
 static ErrorCode add_index_to_manager(IndexManager* manager, Index* index) {
-    if (!manager || !index) return NULL;
+    if (!manager || !index) return ERROR_INVALID_INPUT;
     
     // Resize if needed
     if (manager->index_count >= manager->capacity) {
         int new_capacity = manager->capacity == 0 ? 4 : manager->capacity * 2;
-        Index** new_indices = (Index**)realloc(manager->indices, new_capacity * sizeof(Index*));
+        Index** new_indices = (Index**)realloc(manager->indexes, new_capacity * sizeof(Index*));
         if (!new_indices) return ERROR_MEMORY_ALLOCATION;
         
-        manager->indices = new_indices;
+        manager->indexes = new_indices;
         manager->capacity = new_capacity;
     }
     
-    manager->indices[manager->index_count++] = index;
+    manager->indexes[manager->index_count++] = index;
     return SUCCESS;
 }
 
 // Remove index from manager
 static ErrorCode remove_index_from_manager(IndexManager* manager, const char* table_name, const char* field_name) {
-    if (!manager || !manager->indices) return ERROR_NOT_FOUND;
+    if (!manager || !manager->indexes) return ERROR_NOT_FOUND;
     
     for (int i = 0; i < manager->index_count; i++) {
-        Index* idx = manager->indices[i];
+        Index* idx = manager->indexes[i];
         if (idx && strcmp(idx->table_name, table_name) == 0 && 
             strcmp(idx->field_name, field_name) == 0) {
             // Shift remaining indices
             for (int j = i; j < manager->index_count - 1; j++) {
-                manager->indices[j] = manager->indices[j + 1];
+                manager->indexes[j] = manager->indexes[j + 1];
             }
             manager->index_count--;
             return SUCCESS;
@@ -274,14 +207,14 @@ static ErrorCode remove_index_from_manager(IndexManager* manager, const char* ta
 static void free_index_manager(IndexManager* manager) {
     if (!manager) return;
     
-    if (manager->indices) {
+    if (manager->indexes) {
         for (int i = 0; i < manager->index_count; i++) {
-            if (manager->indices[i]) {
-                free(manager->indices[i]->data);
-                free(manager->indices[i]);
+            if (manager->indexes[i]) {
+                free(manager->indexes[i]->data);
+                free(manager->indexes[i]);
             }
         }
-        free(manager->indices);
+        free(manager->indexes);
     }
     free(manager);
 }
@@ -524,13 +457,13 @@ static void free_simple_query_result(QueryResult* result) {
 
 // Update indexes for a record
 static ErrorCode update_indexes_for_record(Table* table, Record* record, int old_id) {
-    if (!table || !record) return NULL;
+    if (!table || !record) return ERROR_INVALID_INPUT;
     
     IndexManager* manager = table->index_manager;
     if (!manager) return SUCCESS;  // No indexes to update
     
     for (int i = 0; i < manager->index_count; i++) {
-        Index* index = manager->indices[i];
+        Index* index = manager->indexes[i];
         if (!index) continue;
         
         // Find field value to index
@@ -569,13 +502,13 @@ static ErrorCode update_indexes_for_record(Table* table, Record* record, int old
 
 // Remove indexes for a record
 static ErrorCode remove_indexes_for_record(Table* table, int record_id) {
-    if (!table) return NULL;
+    if (!table) return ERROR_INVALID_INPUT;
     
     IndexManager* manager = table->index_manager;
     if (!manager) return SUCCESS;
     
     for (int i = 0; i < manager->index_count; i++) {
-        Index* index = manager->indices[i];
+        Index* index = manager->indexes[i];
         if (index) {
             index_delete_simple(index, record_id);
         }
@@ -604,13 +537,31 @@ Database* db_create() {
     // Initialize transaction start time
     db->transaction_start_time = 0;
     
-    (void) db;
+    return db;
+}
+
+Database* db_open(const char* path, const char* mode) {
+    if (!path) return NULL;
+    
+    FILE* file = fopen(path, "r");
+    if (file) {
+        fclose(file);
+        return db_load_from_file(path, NULL);
+    }
+    
+    return db_create();
+}
+
+ErrorCode db_close(Database* db) {
+    if (!db) return ERROR_INVALID_INPUT;
+    db_free(db);
+    return SUCCESS;
 }
 
 ErrorCode db_add_table(Database* db, const char* name, const char** field_names, 
                       FieldType* types, int field_count, Table** out_table) {
     if (!db || !name || !field_names || !types || field_count < 1 || field_count > MAX_FIELDS_PER_TABLE) {
-        return NULL;
+        return ERROR_INVALID_INPUT;
     }
     
     // Check if table already exists
@@ -632,6 +583,7 @@ ErrorCode db_add_table(Database* db, const char* name, const char** field_names,
         
         Table* new_tables = (Table*)realloc(db->tables, new_capacity * sizeof(Table));
         if (!new_tables) {
+            LOG_ERROR("db_add_table: realloc failed for tables array (capacity=%d)", new_capacity);
             return ERROR_MEMORY_ALLOCATION;
         }
         db->tables = new_tables;
@@ -655,6 +607,8 @@ ErrorCode db_add_table(Database* db, const char* name, const char** field_names,
     table->constraints = (Constraint*)calloc(field_count, sizeof(Constraint));
     
     if (!table->field_names || !table->field_types || !table->constraints) {
+        LOG_ERROR("db_add_table: field info malloc/calloc failed (field_names=%p, field_types=%p, constraints=%p)", 
+                  table->field_names, table->field_types, table->constraints);
         free(table->field_names);
         free(table->field_types);
         free(table->constraints);
@@ -664,6 +618,7 @@ ErrorCode db_add_table(Database* db, const char* name, const char** field_names,
     // Initialize index manager for this table
     table->index_manager = create_simple_index_manager();
     if (!table->index_manager) {
+        LOG_ERROR("db_add_table: index manager creation failed");
         free(table->field_names);
         free(table->field_types);
         free(table->constraints);
@@ -677,6 +632,7 @@ ErrorCode db_add_table(Database* db, const char* name, const char** field_names,
         table->field_types[i] = types[i];
         
         if (!table->field_names[i]) {
+            LOG_ERROR("db_add_table: strdup failed for field %d: '%s'", i, field_names[i] ? field_names[i] : "NULL");
             // Cleanup already allocated fields
             for (int j = 0; j < i; j++) free(table->field_names[j]);
             free(table->field_names);
@@ -719,7 +675,7 @@ Table* db_get_table(Database* db, const char* table_name) {
 // ==================== RECORD OPERATIONS ====================
 
 ErrorCode table_insert_record(Table* table, Field* values, int* out_id) {
-    if (!table || !values) return NULL;
+    if (!table || !values) return ERROR_INVALID_INPUT;
     
     // Check record count limit
     if (table->record_count >= MAX_RECORDS_PER_TABLE) {
@@ -728,7 +684,7 @@ ErrorCode table_insert_record(Table* table, Field* values, int* out_id) {
     
     // Validate field count
     if (values[0].type == TYPE_UNKNOWN) {
-        return NULL;
+        return ERROR_INVALID_INPUT;
     }
     
     // Check constraints
@@ -813,7 +769,7 @@ ErrorCode table_insert_record(Table* table, Field* values, int* out_id) {
 }
 
 ErrorCode db_insert_record(Database* db, const char* table_name, Field* values, int* out_id) {
-    if (!db || !table_name || !values) return NULL;
+    if (!db || !table_name || !values) return ERROR_INVALID_INPUT;
     
     Table* table = db_get_table(db, table_name);
     if (!table) {
@@ -844,7 +800,7 @@ ErrorCode db_insert_record(Database* db, const char* table_name, Field* values, 
 ErrorCode db_batch_insert_records(Database* db, const char* table_name, 
                                   Field** values_array, int count, int** out_ids) {
     if (!db || !table_name || !values_array || count < 1 || count > BATCH_INSERT_SIZE) {
-        return NULL;
+        return ERROR_INVALID_INPUT;
     }
     
     Table* table = db_get_table(db, table_name);
@@ -904,7 +860,7 @@ Record* table_find_record(Table* table, int id) {
     if (table->index_manager && table->index_manager->index_count > 0) {
         // Look for primary key index
         for (int i = 0; i < table->index_manager->index_count; i++) {
-            Index* index = table->index_manager->indices[i];
+            Index* index = table->index_manager->indexes[i];
             if (!index) continue;
             
             if (strcmp(index->field_name, "id") == 0 || 
@@ -1100,7 +1056,7 @@ Record** db_find_all_records_by_field(Database* db, const char* table_name,
 }
 
 ErrorCode table_update_record(Table* table, int id, Field* new_values) {
-    if (!table || !new_values) return NULL;
+    if (!table || !new_values) return ERROR_INVALID_INPUT;
     
     Record* record = table_find_record(table, id);
     if (!record) {
@@ -1147,7 +1103,7 @@ ErrorCode table_update_record(Table* table, int id, Field* new_values) {
     // Update indexes if any fields changed that are indexed
     if (old_values && table->index_manager) {
         for (int i = 0; i < table->index_manager->index_count; i++) {
-            Index* index = table->index_manager->indices[i];
+            Index* index = table->index_manager->indexes[i];
             if (!index) continue;
             
             int field_idx = -1;
@@ -1206,7 +1162,7 @@ ErrorCode table_update_record(Table* table, int id, Field* new_values) {
 }
 
 ErrorCode db_update_record(Database* db, const char* table_name, int id, Field* new_values) {
-    if (!db || !table_name || !new_values) return NULL;
+    if (!db || !table_name || !new_values) return ERROR_INVALID_INPUT;
     
     Table* table = db_get_table(db, table_name);
     if (!table) {
@@ -1235,7 +1191,7 @@ ErrorCode db_update_record(Database* db, const char* table_name, int id, Field* 
 }
 
 ErrorCode table_delete_record(Table* table, int id) {
-    if (!table) return NULL;
+    if (!table) return ERROR_INVALID_INPUT;
     
     Record* prev = NULL;
     Record* curr = table->records;
@@ -1272,7 +1228,7 @@ ErrorCode table_delete_record(Table* table, int id) {
 }
 
 ErrorCode db_delete_record(Database* db, const char* table_name, int id) {
-    if (!db || !table_name) return NULL;
+    if (!db || !table_name) return ERROR_INVALID_INPUT;
     
     Table* table = db_get_table(db, table_name);
     if (!table) {
@@ -1303,7 +1259,7 @@ ErrorCode db_delete_record(Database* db, const char* table_name, int id) {
 ErrorCode db_delete_records_by_field(Database* db, const char* table_name,
                                      const char* field_name, const void* value,
                                      int* out_count) {
-    if (!db || !table_name || !field_name || !value) return NULL;
+    if (!db || !table_name || !field_name || !value) return ERROR_INVALID_INPUT;
     
     if (out_count) *out_count = 0;
     
@@ -1436,7 +1392,7 @@ QueryResult* db_execute_query(Database* db, const char* query) {
 
 ErrorCode db_create_index(Database* db, const char* table_name, 
                          const char* field_name, IndexType type) {
-    if (!db || !table_name || !field_name) return NULL;
+    if (!db || !table_name || !field_name) return ERROR_INVALID_INPUT;
     
     Table* table = db_get_table(db, table_name);
     if (!table) {
@@ -1503,7 +1459,7 @@ ErrorCode db_create_index(Database* db, const char* table_name,
 }
 
 ErrorCode db_drop_index(Database* db, const char* table_name, const char* field_name) {
-    if (!db || !table_name || !field_name) return NULL;
+    if (!db || !table_name || !field_name) return ERROR_INVALID_INPUT;
     
     Table* table = db_get_table(db, table_name);
     if (!table) {
@@ -1521,7 +1477,7 @@ ErrorCode db_drop_index(Database* db, const char* table_name, const char* field_
 // ==================== TRANSACTION MANAGEMENT ====================
 
 ErrorCode db_begin_transaction(Database* db) {
-    if (!db) return NULL;
+    if (!db) return ERROR_INVALID_INPUT;
     
     if (db->transaction_active && db->transaction_level >= MAX_TRANSACTION_LEVEL) {
         return ERROR_TRANSACTION_CONFLICT;
@@ -1542,7 +1498,7 @@ ErrorCode db_begin_transaction(Database* db) {
 }
 
 ErrorCode db_commit_transaction(Database* db) {
-    if (!db) return NULL;
+    if (!db) return ERROR_INVALID_INPUT;
     
     if (!db->transaction_active) {
         return ERROR_TRANSACTION_CONFLICT;
@@ -1563,7 +1519,7 @@ ErrorCode db_commit_transaction(Database* db) {
 }
 
 ErrorCode db_rollback_transaction(Database* db) {
-    if (!db) return NULL;
+    if (!db) return ERROR_INVALID_INPUT;
     
     if (!db->transaction_active) {
         return ERROR_TRANSACTION_CONFLICT;
@@ -1596,7 +1552,7 @@ TableStatistics* db_get_table_statistics(Database* db, const char* table_name) {
 }
 
 ErrorCode db_reset_statistics(Database* db) {
-    if (!db) return NULL;
+    if (!db) return ERROR_INVALID_INPUT;
     
     if (db->statistics) {
         memset(db->statistics, 0, sizeof(DatabaseStatistics));
@@ -1614,7 +1570,7 @@ ErrorCode db_reset_statistics(Database* db) {
 // ==================== MAINTENANCE OPERATIONS ====================
 
 ErrorCode db_vacuum(Database* db) {
-    if (!db) return NULL;
+    if (!db) return ERROR_INVALID_INPUT;
     
     // Rebuild indexes
     for (int i = 0; i < db->table_count; i++) {
@@ -1622,7 +1578,7 @@ ErrorCode db_vacuum(Database* db) {
         
         if (table->index_manager) {
             for (int j = 0; j < table->index_manager->index_count; j++) {
-                Index* index = table->index_manager->indices[j];
+                Index* index = table->index_manager->indexes[j];
                 // Index rebuild logic would go here
             }
         }
@@ -1640,7 +1596,7 @@ ErrorCode db_vacuum(Database* db) {
 }
 
 ErrorCode db_optimize(Database* db) {
-    if (!db) return NULL;
+    if (!db) return ERROR_INVALID_INPUT;
     
     update_simple_statistics(db->statistics, STAT_OPTIMIZATION_OPERATIONS, 1);
     
@@ -1785,7 +1741,7 @@ void db_print_schema(Database* db) {
         printf("Indexes: %d\n", table->index_manager ? table->index_manager->index_count : 0);
         if (table->index_manager && table->index_manager->index_count > 0) {
             for (int j = 0; j < table->index_manager->index_count; j++) {
-                Index* index = table->index_manager->indices[j];
+                Index* index = table->index_manager->indexes[j];
                 if (index) {
                     printf("  - %s (%s)\n", index->field_name,
                            index_type_to_string_simple(index->type));
@@ -1841,3 +1797,35 @@ const char* field_type_to_string(FieldType type) {
         default: return "UNKNOWN";
     }
 }
+FieldType string_to_field_type(const char* str) {
+    if (!str) return TYPE_UNKNOWN;
+    if (strcasecmp(str, "INTEGER") == 0 || strcasecmp(str, "INT") == 0) return TYPE_INT;
+    if (strcasecmp(str, "FLOAT") == 0) return TYPE_FLOAT;
+    if (strcasecmp(str, "STRING") == 0) return TYPE_STRING;
+    if (strcasecmp(str, "BOOLEAN") == 0 || strcasecmp(str, "BOOL") == 0) return TYPE_BOOL;
+    if (strcasecmp(str, "DATETIME") == 0) return TYPE_DATETIME;
+    if (strcasecmp(str, "BLOB") == 0) return TYPE_BLOB;
+    return TYPE_UNKNOWN;
+}
+
+ErrorCode db_explain_query(Database* db, const char* query, char** explanation) { return ERROR_NOT_IMPLEMENTED; }
+ErrorCode db_analyze(Database* db) { return ERROR_NOT_IMPLEMENTED; }
+ErrorCode db_vacuum_table(Database* db, const char* table_name) { return ERROR_NOT_IMPLEMENTED; }
+ErrorCode db_analyze_table(Database* db, const char* table_name) { return ERROR_NOT_IMPLEMENTED; }
+ErrorCode db_check_integrity(Database* db, bool repair) { return ERROR_NOT_IMPLEMENTED; }
+ErrorCode db_repair_table(Database* db, const char* table_name) { return ERROR_NOT_IMPLEMENTED; }
+ErrorCode db_list_config(Database* db, char*** configs, int* count) { return ERROR_NOT_IMPLEMENTED; }
+ErrorCode db_set_config(Database* db, const char* key, const char* value) { return ERROR_NOT_IMPLEMENTED; }
+ErrorCode db_export_schema(Database* db, const char* file_path) { return ERROR_NOT_IMPLEMENTED; }
+ErrorCode db_import_schema(Database* db, const char* file_path) { return ERROR_NOT_IMPLEMENTED; }
+ErrorCode db_drop_table(Database* db, const char* table_name) { return ERROR_NOT_IMPLEMENTED; }
+
+
+ErrorCode db_import_table(Database* db, const char* table_name, const char* format, const char* file_path) { return ERROR_NOT_IMPLEMENTED; }
+ErrorCode db_export_table(Database* db, const char* table_name, const char* format, const char* file_path) { return ERROR_NOT_IMPLEMENTED; }
+ErrorCode db_rebuild_indexes(Database* db) { return ERROR_NOT_IMPLEMENTED; }
+
+ErrorCode db_alter_table_add_column(Database* db, const char* table_name, const char* column_name, FieldType type, void* constraint) { return ERROR_NOT_IMPLEMENTED; }
+ErrorCode db_alter_table_drop_column(Database* db, const char* table_name, const char* column_name) { return ERROR_NOT_IMPLEMENTED; }
+ErrorCode db_alter_table_rename_column(Database* db, const char* table_name, const char* old_name, const char* new_name) { return ERROR_NOT_IMPLEMENTED; }
+ErrorCode db_truncate_table(Database* db, const char* table_name) { return ERROR_NOT_IMPLEMENTED; }

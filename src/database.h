@@ -8,26 +8,7 @@
 #include <time.h>
 #include <stddef.h>
 
-// Constants
-#define MAX_FIELD_LEN 256
-#define MAX_TABLES 100
-#define MAX_FIELDS_PER_TABLE 50
-#define MAX_RECORDS_PER_TABLE 1000000
-#define MAX_INDEXES_PER_TABLE 10
-#define INITIAL_CAPACITY 100
-#define QUERY_CACHE_SIZE 100
-#define MAX_TRANSACTION_LEVEL 10
-#define DEFAULT_BTREE_DEGREE 3
-#define DEFAULT_SKIPLIST_MAX_LEVEL 16
-#define BATCH_INSERT_SIZE 1000
-#define MAX_FIELD_NAME 64
-#define MAX_TABLE_NAME 64
-#define MAX_INDEX_NAME 64
-
-// Cache policies
-#define CACHE_LRU 0
-#define CACHE_FIFO 1
-#define CACHE_LFU 2
+// Constants and policies are now in config.h and types.h
 
 // Statistics constants
 typedef enum {
@@ -47,42 +28,7 @@ typedef enum {
     STAT_OPTIMIZATION_OPERATIONS
 } StatType;
 
-// Error codes
-typedef enum {
-    SUCCESS = 0,
-    ERROR_NOT_FOUND = -1,
-    ERROR_DUPLICATE_KEY = -2,
-    ERROR_MEMORY_ALLOCATION = -3,
-    ERROR_INVALID_PARAMETER = -4,
-    ERROR_TABLE_FULL = -5,
-    ERROR_TRANSACTION_CONFLICT = -6,
-    ERROR_TYPE_MISMATCH = -7,
-    ERROR_CONSTRAINT_VIOLATION = -8,
-    ERROR_INDEX_EXISTS = -9,
-    ERROR_NOT_IMPLEMENTED = -10
-} ErrorCode;
-
-// Field types
-typedef enum {
-    TYPE_UNKNOWN = 0,
-    TYPE_INT,
-    TYPE_STRING,
-    TYPE_FLOAT,
-    TYPE_DOUBLE,
-    TYPE_BOOL,
-    TYPE_DATETIME,
-    TYPE_BLOB,
-    TYPE_NULL
-} FieldType;
-
-// Index types
-typedef enum {
-    INDEX_HASH,
-    INDEX_BTREE,
-    INDEX_SKIPLIST,
-    INDEX_BITMAP,
-    INDEX_FULLTEXT
-} IndexType;
+// Types are defined in types.h
 
 // Query types
 typedef enum {
@@ -142,18 +88,15 @@ typedef struct Record {
 
 // Index structure
 struct Index {
+    char name[MAX_INDEX_NAME];
     char table_name[MAX_TABLE_NAME];
     char field_name[MAX_FIELD_LEN];
     IndexType type;
     void* data;  // Implementation-specific data
+    size_t size;
 };
 
-// IndexManager structure
-struct IndexManager {
-    Index** indices;
-    int index_count;
-    int capacity;
-};
+// IndexManager defined in index.h
 
 // Table statistics structure
 struct TableStatistics {
@@ -162,6 +105,7 @@ struct TableStatistics {
     long long records_deleted;
     long long index_scans;
     long long sequential_scans;
+    size_t total_size_bytes;
 };
 
 // Table structure
@@ -245,6 +189,7 @@ typedef struct {
 // ====================== Function Prototypes ====================== //
 
 // Database management
+char* get_database_name(Database* db);
 Database* db_create(void);
 Database* db_open(const char* path, const char* mode);
 ErrorCode db_close(Database* db);
@@ -279,7 +224,7 @@ ErrorCode db_delete_records_by_field(Database* db, const char* table_name,
 // Index operations
 ErrorCode db_create_index(Database* db, const char* table_name, const char* field_name, IndexType type);
 ErrorCode db_drop_index(Database* db, const char* table_name, const char* field_name);
-Index* index_manager_get_index(IndexManager* manager, const char* field_name);
+
 
 // Transaction management
 ErrorCode db_begin_transaction(Database* db);
@@ -296,6 +241,7 @@ QueryResult* db_execute_query(Database* db, const char* query);
 
 // Utility
 const char* field_type_to_string(FieldType type);
+FieldType string_to_field_type(const char* str);
 
 // Internal table functions
 ErrorCode table_insert_record(Table* table, Field* values, int* out_id);
@@ -303,5 +249,25 @@ Record* table_find_record(Table* table, int id);
 ErrorCode table_update_record(Table* table, int id, Field* new_values);
 ErrorCode table_delete_record(Table* table, int id);
 void table_free(Table* table);
+
+
+ErrorCode db_explain_query(Database* db, const char* query, char** explanation);
+ErrorCode db_analyze(Database* db);
+ErrorCode db_vacuum_table(Database* db, const char* table_name);
+ErrorCode db_analyze_table(Database* db, const char* table_name);
+ErrorCode db_check_integrity(Database* db, bool repair);
+ErrorCode db_repair_table(Database* db, const char* table_name);
+ErrorCode db_list_config(Database* db, char*** configs, int* count);
+ErrorCode db_set_config(Database* db, const char* key, const char* value);
+ErrorCode db_export_schema(Database* db, const char* file_path);
+ErrorCode db_import_schema(Database* db, const char* file_path);
+ErrorCode db_drop_table(Database* db, const char* table_name);
+ErrorCode db_import_table(Database* db, const char* table_name, const char* format, const char* file_path);
+ErrorCode db_export_table(Database* db, const char* table_name, const char* format, const char* file_path);
+ErrorCode db_rebuild_indexes(Database* db);
+ErrorCode db_alter_table_add_column(Database* db, const char* table_name, const char* column_name, FieldType type, void* constraint);
+ErrorCode db_alter_table_drop_column(Database* db, const char* table_name, const char* column_name);
+ErrorCode db_alter_table_rename_column(Database* db, const char* table_name, const char* old_name, const char* new_name);
+ErrorCode db_truncate_table(Database* db, const char* table_name);
 
 #endif // DATABASE_H
