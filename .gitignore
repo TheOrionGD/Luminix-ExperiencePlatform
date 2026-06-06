@@ -6,6 +6,7 @@
 *.obj
 src/*.o
 tests/*.o
+!luminix.exe
 
 # Database States & Runtime Data
 *.state.json
