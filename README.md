@@ -836,4 +836,4 @@ A: We currently support simple `ALTER TABLE` statements for adding columns. More
 A: The hard limit is defined by the page size and overflow chaining mechanism, but practically, JSON documents up to 16MB are extremely performant. 
 
 ---
-*Built with passion, performance, and precision by the Luminix Team.*
+*Luminix Team. INNOVATE BUILD IMPACT*
